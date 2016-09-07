@@ -5,7 +5,7 @@ import re
 import copy
 import collections
 
-SEQUENCE_START_REGEX ='>sequence(?P<sequence_id>\d)\n'
+FASTA_SEQUENCE_START_REGEX ='>(?P<sequence_id>.*)\n'
 A = 'A'
 C = 'C'
 G = 'G'
@@ -26,7 +26,7 @@ def getInputArguments():
     return args.inputFile
 
 def getMatch(line):
-    pattern = re.compile(SEQUENCE_START_REGEX)
+    pattern = re.compile(FASTA_SEQUENCE_START_REGEX)
     return pattern.match(line)
 
 def isSequenceStart(line):
@@ -94,7 +94,7 @@ if __name__ == '__main__':
     print(TABLE_FORMAT.format('Seq_name',LEN,A,C,G,T))
     print(TABLE_FORMAT.format('--------','---','---','---','---','---'))
     for sequence_id, sequenceCounts in orderedSequenceCounts.items():
-        sequenceName = 'sequence' + str(sequence_id)
+        sequenceName = str(sequence_id)
         print(TABLE_FORMAT.format(
             sequenceName,
             sequenceCounts[LEN],
