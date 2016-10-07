@@ -75,7 +75,7 @@ def score_dynamic_programming(sequence1, sequence2):
     matrix = [[0 for x in range(width)] for y in range(height)]
     for x in range(1, width):
         for y in range(1, height):
-            scores = []
+            scores = [0]
             dx, dy = x - 1, y - 1
             character_x, character_y = sequence1[x - 1], sequence2[y - 1]
             ix, iy = SCORE_MATRIX_INDEX[character_x], SCORE_MATRIX_INDEX[character_y]
@@ -84,7 +84,7 @@ def score_dynamic_programming(sequence1, sequence2):
             scores.append(matrix[y][dx] + GAP_PENTALTY)
             scores.append(matrix[dy][x] + GAP_PENTALTY)
             matrix[y][x] = max(scores)
-    return matrix, matrix[height - 1][width - 1]
+    return matrix, max(map(max, matrix))
 
 
 def print_matrix(matrix, X, Y):
