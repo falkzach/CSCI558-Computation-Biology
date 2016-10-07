@@ -60,13 +60,9 @@ def read_sequences_from_file(file_name):
 
 def global_score(sequence1, sequence2):
     width, height = len(sequence1) + 1, len(sequence2) + 1
-    matrix = [[0 for x in range(width)] for y in range(height)]
 
-    # fill out first row/col that you're skipping, should be 0, -1 ... -42
-    for x in range(1, width):
-        matrix[0][x] = -1 * x
-    for y in range(1, height):
-        matrix[y][0] = -1 * y
+    # fill out first row/col instead of skipping, should be 0, -1 ... -42
+    matrix = [[(0 if x > 0 and y > 0 else (-1 * x) or (-1 * y)) for x in range(width)] for y in range(height)]
 
     for x in range(1, width):
         for y in range(1, height):
@@ -96,5 +92,5 @@ if __name__ == '__main__':
     Y = sequences['seq2']
 
     matrix, score = global_score(X, Y)
-    print_matrix(matrix, X, Y)
+    # print_matrix(matrix, X, Y)
     print("The score is " + str(score))

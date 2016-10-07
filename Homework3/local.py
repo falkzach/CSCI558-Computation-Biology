@@ -103,5 +103,5 @@ if __name__ == '__main__':
     Y = sequences['seq2']
 
     matrix, score = score_dynamic_programming(X, Y)
-    print_matrix(matrix, X, Y)
+    # print_matrix(matrix, X, Y)
     print("The score is " + str(score))
