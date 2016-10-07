@@ -73,6 +73,15 @@ def global_score(sequence1, sequence2):
     return matrix, matrix[height - 1][width - 1]
 
 
+def print_matrix(matrix, X, Y):
+    row_format = '{:^3}' * (len(X) + 2)
+    print(row_format.format(*list('  ' + X)))
+    Y = ' ' + Y
+    for col, row in enumerate(matrix):
+        row.insert(0, Y[col])
+        print(row_format.format(*row))
+
+
 if __name__ == '__main__':
     input_file = get_input_arguments()
     sequences = read_sequences_from_file(input_file)
@@ -82,8 +91,5 @@ if __name__ == '__main__':
     # Y = 'GGATCGA'
 
     matrix, score = global_score(X, Y)
-    print(score)
-    print(X)
-    print(Y)
-    for row in matrix:
-        print(row)
+    print_matrix(matrix, X, Y)
+    print("The score is " + str(score))

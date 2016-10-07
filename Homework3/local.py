@@ -77,13 +77,23 @@ def score_dynamic_programming(sequence1, sequence2):
         for y in range(1, height):
             scores = []
             dx, dy = x - 1, y - 1
-            ix, iy = SCORE_MATRIX_INDEX[sequence1[x - 1]], SCORE_MATRIX_INDEX[sequence2[y - 1]]
+            character_x, character_y = sequence1[x - 1], sequence2[y - 1]
+            ix, iy = SCORE_MATRIX_INDEX[character_x], SCORE_MATRIX_INDEX[character_y]
             local_score = SCORE_MATRIX[iy][ix]
             scores.append(matrix[dy][dx] + local_score)
             scores.append(matrix[y][dx] + GAP_PENTALTY)
             scores.append(matrix[dy][x] + GAP_PENTALTY)
             matrix[y][x] = max(scores)
     return matrix, matrix[height - 1][width - 1]
+
+
+def print_matrix(matrix, X, Y):
+    row_format = '{:^3}' * (len(X) + 2)
+    print(row_format.format(*list('  ' + X)))
+    Y = ' ' + Y
+    for col, row in enumerate(matrix):
+        row.insert(0, Y[col])
+        print(row_format.format(*row))
 
 
 if __name__ == '__main__':
@@ -93,8 +103,5 @@ if __name__ == '__main__':
     Y = sequences['seq2']
 
     matrix, score = score_dynamic_programming(X, Y)
-    print(score)
-    print(X)
-    print(Y)
-    for row in matrix:
-        print(row)
+    print_matrix(matrix, X, Y)
+    print("The score is " + str(score))
