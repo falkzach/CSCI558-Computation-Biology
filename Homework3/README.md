@@ -17,6 +17,9 @@
     
 ## simulate.py
 Depends on matplotlib for the histogram, to install
+
     pip install -r requirements.txt
+    
+Note that due to problems with the bioserver environment, the shebang line has been changed to use python 2
     
     python ./simulate.py
