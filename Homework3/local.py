@@ -16,7 +16,6 @@ SCORE_MATRIX = [
     [-5, 4, -1, -5],
     [-5, -1, 4, -5],
     [-1, -5, -5, 4]
-
 ]
 GAP_PENTALTY = -5
 
@@ -70,7 +69,7 @@ def read_sequences_from_file(file_name):
     return sequences
 
 
-def score_dynamic_programming(sequence1, sequence2):
+def local_score(sequence1, sequence2):
     width, height = len(sequence1) + 1, len(sequence2) + 1
     matrix = [[0 for x in range(width)] for y in range(height)]
     for x in range(1, width):
@@ -102,6 +101,6 @@ if __name__ == '__main__':
     X = sequences['seq1']
     Y = sequences['seq2']
 
-    matrix, score = score_dynamic_programming(X, Y)
+    matrix, score = local_score(X, Y)
     # print_matrix(matrix, X, Y)
     print("The score is " + str(score))

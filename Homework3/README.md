@@ -14,3 +14,9 @@
 
 ## local.py
     python ./local.py dotplot-example.fa
+    
+## simulate.py
+Depends on matplotlib for the histogram, to install
+    pip install -r requirements.txt
+    
+    python ./simulate.py
