@@ -1,5 +1,9 @@
+#!/usr/bin/python
 #!/usr/local/bin/python3
 
+# note that the shebang is set to run from python2 instead of python3, matplotlib missing on target env for python3
+
+from __future__ import print_function
 
 import random
 import matplotlib.pyplot as plt
@@ -61,7 +65,7 @@ def print_matrix(matrix, X, Y):
 if __name__ == '__main__':
     scores = []
     for x in range(NUMBER_SIMULATIONS):
-        print(x, end='\r')
+        print(str(x) + '/' + str(NUMBER_SIMULATIONS), end='\r')
         X = ''.join(random.choice(ACTG) for i in range(SEQUENCE_LENGTH))
         Y = ''.join(random.choice(ACTG) for i in range(SEQUENCE_LENGTH))
         matrix, score = local_score(X, Y)
