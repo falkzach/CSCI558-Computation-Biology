@@ -75,7 +75,7 @@ if __name__ == '__main__':
     print(scores)
 
     plt.hist(scores)
-    plt.title('Local Alignment Scores for ' + str(NUMBER_SIMULATIONS) + ' simulations of pairwise ' + str(SEQUENCE_LENGTH) + ' sequences')
+    plt.title('Local Alignment Scores for ' + str(NUMBER_SIMULATIONS) + ' simulations of pairwise ' + str(SEQUENCE_LENGTH) + ' character sequences')
     plt.xlabel('Scores')
     plt.ylabel('frequency')
     plt.savefig('simulated.png')
