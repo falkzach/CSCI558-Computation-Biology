@@ -29,10 +29,15 @@ P_state = {
         EXON: 0.95,
         INTRON: 0.04,
         END: 0.01
+        # EXON: 0.98,
+        # INTRON: 0.01,
+        # END: 0.01
     },
     INTRON: {
         INTRON: 0.95,
         EXON: 0.05
+        # INTRON: 0.96,
+        # EXON: 0.04
     }
 }
 
@@ -42,6 +47,10 @@ P_emit = {
         C: 0.4,
         G: 0.4,
         T: 0.1
+        # A: 0.25,
+        # C: 0.25,
+        # G: 0.25,
+        # T: 0.25
     },
     INTRON: {
         A: 0.4,
@@ -131,35 +140,40 @@ def read_stdin():
 
 def label_sequence(data):
     X = [x for x in data]
-    label = ''
-    width, height = len(X), 2
+    label = 'E'
+    width, height = len(X), len(P_emit)
     matrix = [[0 for x in range(width)] for y in range(height)]
 
-
     character = X[0]
-    matrix[0][0] = 1 * P_emit[EXON][character]# start position, this should be multiplied by first char, change, state, emit, remember
+    # start position, this should be multiplied by first char, change; state, emit, remember
+    matrix[0][0] = P_state[START][EXON] * P_emit[EXON][character]  # .25 for book example
     # is matrix[1][0] 0 since it cant start?
     for x in range(1, width):
         for y in range(height):
-            state_key = VITIBRI_ID[y]
-            P_s = P_state[state_key]
-            P_e = P_emit[state_key]
             # P(sequence | gene model)/P(sequence | background model)
             # log2(p) FOR LOG ODDS RATIO
-            character = X[x]
+
             # p = math.log(
             #     (P_s[state_key] * P_e[character]) /
             #     (P_BG_state[BACKGROUND][BACKGROUND] * P_BG_emit[BACKGROUND][character]),
             #     2
             # )
-            p = P_s[state_key] * P_e[character]
-            e = matrix[0][x-1] * p
-            i = matrix[1][x-1] * p
+
+            character = X[x]
+            state_key = VITIBRI_ID[y]
+
+            pe = P_state[state_key][EXON] * P_emit[EXON][character]
+            pi = P_state[state_key][INTRON] * P_emit[INTRON][character]
+            e = matrix[0][x-1] * pe
+            i = matrix[1][x-1] * pi
             v = max(e, i)
             matrix[y][x] = v
 
         # pretty sure this is very wrong
         winning_state_key = EXON if matrix[0][x] > matrix[1][x] else INTRON
+
+        if x == width - 1:
+            winning_state_key = EXON # because we must always end as an exon
         label += VITIBRI_LABELS[winning_state_key]
 
     print(data)
@@ -178,3 +192,6 @@ if __name__ == '__main__':
         data = read_stdin()
         label_sequence(data)
     exit(0)
+
+
+#bits loged vitirbi/ loged backgroud "" bits
