@@ -29,15 +29,10 @@ P_state = {
         EXON: 0.95,
         INTRON: 0.04,
         END: 0.01
-        # EXON: 0.98,
-        # INTRON: 0.01,
-        # END: 0.01
     },
     INTRON: {
         INTRON: 0.95,
         EXON: 0.05
-        # INTRON: 0.96,
-        # EXON: 0.04
     }
 }
 
@@ -47,10 +42,6 @@ P_emit = {
         C: 0.4,
         G: 0.4,
         T: 0.1
-        # A: 0.25,
-        # C: 0.25,
-        # G: 0.25,
-        # T: 0.25
     },
     INTRON: {
         A: 0.4,
@@ -126,12 +117,15 @@ def emit_character(current_state):
 
 def emit_sequence():
     state = START
+    history = ''
     while True:
         state = change_state(state)
         if state == END:
             break
+        history += VITIBRI_LABELS[state]
         emit_character(state)
     sys.stdout.write('\n')
+    # print(history)
 
 
 def read_stdin():
@@ -142,15 +136,14 @@ def label_sequence(data):
     X = [x for x in data]
     label = 'E'
     width, height = len(X), len(P_emit)
-    # avoid floating point underflow issues by working in log space log(p) + log(p) .... vs p*p....
     matrix = [[0 for x in range(width)] for y in range(height)]
     background = [0 for x in range(width)]
 
     character = X[0]
     # start position, this should be multiplied by first char, change; state, emit, remember
+    # avoid floating point underflow issues by working in log space log(p) + log(p) .... vs p*p....
     matrix[0][0] = math.log(P_state[START][EXON] * P_emit[EXON][character], 2)
     background[0] = math.log(P_BG_state[START][BACKGROUND] * P_BG_emit[BACKGROUND][character], 2)
-    # is matrix[1][0] 0 since it cant start?
     for x in range(1, width):
         character = None
         for y in range(height):
