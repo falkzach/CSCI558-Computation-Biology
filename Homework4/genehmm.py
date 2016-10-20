@@ -142,46 +142,33 @@ def label_sequence(data):
     X = [x for x in data]
     label = 'E'
     width, height = len(X), len(P_emit)
+    # avoid floating point underflow issues by working in log space log(p) + log(p) .... vs p*p....
     matrix = [[0 for x in range(width)] for y in range(height)]
+    background = [0 for x in range(width)]
 
     character = X[0]
     # start position, this should be multiplied by first char, change; state, emit, remember
-    matrix[0][0] = P_state[START][EXON] * P_emit[EXON][character]  # .25 for book example
+    matrix[0][0] = math.log(P_state[START][EXON] * P_emit[EXON][character], 2)
+    background[0] = math.log(P_BG_state[START][BACKGROUND] * P_BG_emit[BACKGROUND][character], 2)
     # is matrix[1][0] 0 since it cant start?
     for x in range(1, width):
+        character = None
         for y in range(height):
-            # P(sequence | gene model)/P(sequence | background model)
-            # log2(p) FOR LOG ODDS RATIO
-
-            # p = math.log(
-            #     (P_s[state_key] * P_e[character]) /
-            #     (P_BG_state[BACKGROUND][BACKGROUND] * P_BG_emit[BACKGROUND][character]),
-            #     2
-            # )
-
             character = X[x]
             state_key = VITIBRI_ID[y]
+            e = matrix[0][x-1] + math.log(P_state[state_key][EXON] * P_emit[EXON][character], 2)
+            i = matrix[1][x-1] + math.log(P_state[state_key][INTRON] * P_emit[INTRON][character], 2)
+            matrix[y][x] = max(e, i)
+        # background model
+        background[x] = background[x-1] + math.log(P_BG_state[BACKGROUND][BACKGROUND] * P_BG_emit[BACKGROUND][character], 2)
 
-            pe = P_state[state_key][EXON] * P_emit[EXON][character]
-            pi = P_state[state_key][INTRON] * P_emit[INTRON][character]
-            e = matrix[0][x-1] * pe
-            i = matrix[1][x-1] * pi
-            v = max(e, i)
-            matrix[y][x] = v
-
-        # pretty sure this is very wrong
+        # label
         winning_state_key = EXON if matrix[0][x] > matrix[1][x] else INTRON
-
         if x == width - 1:
             winning_state_key = EXON # because we must always end as an exon
         label += VITIBRI_LABELS[winning_state_key]
-
-    print(data)
-    print(label)
-    for row in matrix:
-        print(row)
-    print(matrix[0][width - 1])
-    print(matrix[1][width - 1])
+    log_odds_ratio = matrix[0][width - 1] - background[width - 1]
+    return label, log_odds_ratio
 
 
 if __name__ == '__main__':
@@ -190,8 +177,8 @@ if __name__ == '__main__':
         emit_sequence()
     elif mode == LABEL:
         data = read_stdin()
-        label_sequence(data)
+        label, ratio = label_sequence(data)
+
+        print(label)
+        print('%.2f bits\n' % ratio)
     exit(0)
-
-
-#bits loged vitirbi/ loged backgroud "" bits
