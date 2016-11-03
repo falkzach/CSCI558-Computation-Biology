@@ -28,6 +28,7 @@ if __name__ == '__main__':
     out, err = process2.communicate()
     clean = [line.decode('UTF-8') for line in out.splitlines()]
 
+    # nasty poorly contrived regexes
     query_regex = '>>\s+(?P<sequence>.*)'
     value_regex = '\s+\d\s+!\s+(?P<score>\S+)\s+(?P<bias>\S+)\s+.*'
     query_pattern = re.compile(query_regex)
@@ -37,22 +38,28 @@ if __name__ == '__main__':
     match = False
     sequence = ''
     results = []
+    # this is diry, so have some comments to explain
+    # parse out data from output
     for line in clean:
-        # print(line)
+        # if we've found a sequence line, we need to skip some lines
         if count >= 0:
             count -= 1
             if count != 0:
                 continue
+        # otherwise check for a new sequence string
         else:
             match = query_pattern.match(line)
 
+        # if we've found a sequence line and then skipped formatting lines, look at scores
         if match and (count == 0):
             values = value_pattern.match(line)
+            # extract eval and bias from the score line via regex
             score = values.group('score')
             bias = values.group('bias')
             results.append((sequence, score, bias))
             match = False
 
+        # if we've found a line, set the counter to skip formatting lines
         if match:
             sequence = match.group('sequence')
             count = 3
