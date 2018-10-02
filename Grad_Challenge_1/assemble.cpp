@@ -141,19 +141,47 @@ int compare_sequences(const int I, const int J) {
 void build_edge(const std::vector<std::string> fragments, const int I, const int J, graphLike graph) {
     int weightI = 0;  //suffix of I prefix of J I -> J
     int weightJ = 0;  //suffix of J prefix of I J -> I
-
     std::cout << "comparing sequences: " << fragments[I] << " and " << fragments[J] << std::endl;
 
-    /* I feel so dumb.... */
-    // int maxCompLength = std::min(fragments[I].length(), fragments[J].length());
-    // int I_is_longer = ( fragments[I].length() < fragments[J].length() )? 0:1;
-    for(int i = 0, j=fragments[J].length() - 1;
+    for (int i = 0, j=fragments[J].length() - 1;
         i < fragments[I].length() && j >= 0;
         ++i, --j) {
-            for (int c = 0; c < i; ++c) {
-
-                std::cout << "comparing: " << fragments[I][i] << " with "<< fragments [J][j - c] << std::endl;
+            weightJ = 0;
+            for (int c = 0, d = j; c < i && d < fragments[J].length(); ++c, ++d) {
+                // std::cout << "characters: " << c << " " << d << std::endl;
+                // std::cout << "comparing: " << fragments[I][c] << " with "<< fragments [J][d] << std::endl;
+                if(fragments[I][c] == fragments [J][d]) {
+                    // std::cout << "match" << std::endl;
+                    ++weightJ;
+                    // std::cout << "weightJ: " << weightJ << std::endl;
+                } else {
+                    break;
+                }
             }
+    }
+    std::cout << std::endl;
+
+    if (weightJ > 0) {
+        std::pair<int, int> edge = {I, weightJ};
+        graph[J].push_back(edge);
+    }
+
+    for (int i=fragments[I].length() -1, j=0;
+        i >=0 && j < fragments[J].length();
+        --i, ++j) {
+            for(int c = i, d = 0; c < fragments[I].length() && d < j; ++c, ++d) {
+                if(fragments[I][c] == fragments [J][d]) {
+                    ++weightI;
+                    // std::cout << "weightI: " << weightI << std::endl;
+                } else {
+                    break;
+                }
+            }
+    }
+
+    if (weightI > 0) {
+        std::pair<int, int> edge = {J, weightI};
+        graph[I].push_back(edge);
     }
 
 
@@ -184,6 +212,10 @@ void build_graph(const std::vector<std::string> fragments, graphLike graph) {
                 build_edge(fragments,i,j,graph);
         }
     }
+}
+
+for (auto node: graph.) {
+
 }
 
 int main(int argc, char**argv) {
