@@ -97,6 +97,7 @@ void bit_pack(unsigned long * & result, unsigned long & num_blocks, const std::s
 	result[num_blocks-1] = next_block;
 }
 
+//TODO: FIXME!
 std::string unpack(const unsigned long * genome, const unsigned long & num_blocks, unsigned long length) {
     std::string result;
     unsigned long chars_left = length;
@@ -134,7 +135,17 @@ void print_bitpacked_string(const unsigned long* genome, const unsigned long & n
 	std::cout << std::endl;
 }
 
-void build_edge(const std::vector<std::string> fragments, const int I, const int J, graphLike graph) {
+void add_score_edge(graphLike & scoreGraph, const int score, const int A, const int B) {
+    if (scoreGraph.count(score) == 0) {
+        std::vector<std::pair<int, int>> edges;
+        scoreGraph[score] = edges;
+    }
+    std::pair<int, int> edge = {A, B};
+    scoreGraph[score].push_back(edge);
+    // std::cout << "New Score Edge: " << A << " -> " << B << " score: " << score << std::endl;
+}
+
+void build_edge(const std::vector<std::string> fragments, const int I, const int J, graphLike & graph, graphLike & scoreGraph) {
     int weightI = 0;  //suffix of I prefix of J I -> J
     int weightJ = 0;  //suffix of J prefix of I J -> I
 
@@ -154,7 +165,8 @@ void build_edge(const std::vector<std::string> fragments, const int I, const int
     if (weightJ > 0) {
         std::pair<int, int> edge = {I, weightJ};
         graph[J].push_back(edge);
-        std::cout << "New Edge: " << J << " -> " << I << " weightJ: " << weightJ << std::endl;
+        add_score_edge(scoreGraph, weightJ, J, I);
+        // std::cout << "New Edge: " << J << " -> " << I << " weightJ: " << weightJ << std::endl;
     }
 
     for (int i=fragments[I].length() -1, j=0;
@@ -172,13 +184,14 @@ void build_edge(const std::vector<std::string> fragments, const int I, const int
     if (weightI > 0) {
         std::pair<int, int> edge = {J, weightI};
         graph[I].push_back(edge);
-        std::cout << "New Edge: " << I << " -> " << J << " weightI: " << weightI << std::endl;
+        add_score_edge(scoreGraph, weightI, I, J);
+        // std::cout << "New Edge: " << I << " -> " << J << " weightI: " << weightI << std::endl;
     }
 
 }
 
 /* String version TODO: bitpack*/
-void build_graph(const std::vector<std::string> fragments, graphLike graph) {
+void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & scores) {
     /* put all nodes in the graph with no edges */
     for(unsigned long i=0; i < fragments.size(); ++i) {
         std::vector<std::pair<int, int>> adjacencies;
@@ -188,8 +201,37 @@ void build_graph(const std::vector<std::string> fragments, graphLike graph) {
     /* build out edges of graph */
     for(unsigned long i=0; i < fragments.size(); ++i) {
         for (unsigned long j=i+1; j < fragments.size(); ++j) {
-                build_edge(fragments,i,j,graph);
+                build_edge(fragments,i,j,graph,scores);
         }
+    }
+}
+
+void print_adjacency_lists(graphLike & graph){
+    std::cout << "Graph Adjacency Lists" << std::endl;
+
+    for (auto it=graph.begin(); it!=graph.end(); ++it) {
+        std::cout << it->first << ":\t";
+
+        for (auto pair=it->second.begin(); pair!=it->second.end(); ++pair) {
+            std::cout << pair->first << "(" << pair->second << "),\t";
+        }
+
+        std::cout << std::endl;
+    }
+}
+
+void merge_nodes(const int score, const int S, const int P, graphLike & graph, std::string & result) {
+
+}
+
+
+
+
+/* Greedily collapse the graph to a single node */
+void colapse_graph(graphLike & graph, graphLike & scoreGraph) {
+    for (auto rit=scoreGraph.rbegin(); rit!=scoreGraph.rend(); ++rit) {
+        std::cout << "Score: " << rit->first << std::endl;
+        //TODO: ...
     }
 }
 
@@ -204,7 +246,7 @@ int main(int argc, char**argv) {
 		std::vector<unsigned long> num_blocks_in_fragments;
 
         graphLike graph;
-        graphLike scoresMap; //std::map<score, std::vector <std::pair<to, from>>>
+        graphLike scoresGraph; //std::map<score, std::vector <std::pair<to, from>>>
 
         std::string packed_result;
         std::string result;
@@ -219,6 +261,9 @@ int main(int argc, char**argv) {
 		}
 		fragments_fin.close();
 
+        //TODO: maybe? idk
+        sort(fragments.begin(), fragments.end());
+
         /* bit pack fragments */
         // for(std::string fragment: fragments) {
 		// 	bit_pack(packed_fragment, num_blocks_in_fragment, fragment);
@@ -227,20 +272,22 @@ int main(int argc, char**argv) {
 		// }
 
         /* Sanity Check */
-        // for(unsigned long i=0; i < packed_fragments.size(); ++i) {
-        //     std::cout << "original: " << fragments[i] << std::endl;
-        //     print_bitpacked_string(packed_fragments[i], num_blocks_in_fragments[i]);
+        for(unsigned long i=0; i < fragments.size(); ++i) {
+            std::cout << "original: " << fragments[i] << std::endl;
+            // print_bitpacked_string(packed_fragments[i], num_blocks_in_fragments[i]);
             
-        //     std::string unpacked;
-        //     unpacked = unpack(packed_fragments[i], num_blocks_in_fragments[i], fragment_lengths[i]);
-        //     std::cout << "unpacked: " << unpacked << std::endl << std::endl;
-        // }
+            // std::string unpacked;
+            // unpacked = unpack(packed_fragments[i], num_blocks_in_fragments[i], fragment_lengths[i]);
+            // std::cout << "unpacked: " << unpacked << std::endl << std::endl;
+        }
 
         /* Build Graph */
-        build_graph(fragments, graph);
+        build_graph(fragments, graph, scoresGraph);
 
+        print_adjacency_lists(graph);
+        
         /* Assemble... */
-
+        colapse_graph(graph, scoresGraph);
 
         /* Output */
         // result = "GATTACCAATTACCAGGA"; /* TODO: DOTHIS" */
