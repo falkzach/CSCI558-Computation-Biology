@@ -134,36 +134,27 @@ void print_bitpacked_string(const unsigned long* genome, const unsigned long & n
 	std::cout << std::endl;
 }
 
-int compare_sequences(const int I, const int J) {
-
-}
-
 void build_edge(const std::vector<std::string> fragments, const int I, const int J, graphLike graph) {
     int weightI = 0;  //suffix of I prefix of J I -> J
     int weightJ = 0;  //suffix of J prefix of I J -> I
-    std::cout << "comparing sequences: " << fragments[I] << " and " << fragments[J] << std::endl;
 
     for (int i = 0, j=fragments[J].length() - 1;
         i < fragments[I].length() && j >= 0;
         ++i, --j) {
             weightJ = 0;
             for (int c = 0, d = j; c < i && d < fragments[J].length(); ++c, ++d) {
-                // std::cout << "characters: " << c << " " << d << std::endl;
-                // std::cout << "comparing: " << fragments[I][c] << " with "<< fragments [J][d] << std::endl;
                 if(fragments[I][c] == fragments [J][d]) {
-                    // std::cout << "match" << std::endl;
                     ++weightJ;
-                    // std::cout << "weightJ: " << weightJ << std::endl;
                 } else {
                     break;
                 }
             }
     }
-    std::cout << std::endl;
 
     if (weightJ > 0) {
         std::pair<int, int> edge = {I, weightJ};
         graph[J].push_back(edge);
+        std::cout << "New Edge: " << J << " -> " << I << " weightJ: " << weightJ << std::endl;
     }
 
     for (int i=fragments[I].length() -1, j=0;
@@ -172,7 +163,6 @@ void build_edge(const std::vector<std::string> fragments, const int I, const int
             for(int c = i, d = 0; c < fragments[I].length() && d < j; ++c, ++d) {
                 if(fragments[I][c] == fragments [J][d]) {
                     ++weightI;
-                    // std::cout << "weightI: " << weightI << std::endl;
                 } else {
                     break;
                 }
@@ -182,18 +172,7 @@ void build_edge(const std::vector<std::string> fragments, const int I, const int
     if (weightI > 0) {
         std::pair<int, int> edge = {J, weightI};
         graph[I].push_back(edge);
-    }
-
-
-
-    if (weightI == 0 && weightJ == 0) {
-        std::cout << "no match: " << fragments[I] << " " << fragments[J] << std::endl;
-    } else if (weightI == weightJ) {
-        std::cout << "match: " << fragments[I] << " <-> " << fragments[J] << std::endl;
-    } else if (weightI > 0) {
-        std::cout << "match: " << fragments[I] << " -> " << fragments[J] << std::endl;
-    } else if (weightJ > 0) {
-        std::cout << "match: " << fragments[J] << " <- " << fragments[I] << std::endl;
+        std::cout << "New Edge: " << I << " -> " << J << " weightI: " << weightI << std::endl;
     }
 
 }
@@ -214,10 +193,6 @@ void build_graph(const std::vector<std::string> fragments, graphLike graph) {
     }
 }
 
-for (auto node: graph.) {
-
-}
-
 int main(int argc, char**argv) {
 
     if (argc == 2) {
@@ -229,6 +204,7 @@ int main(int argc, char**argv) {
 		std::vector<unsigned long> num_blocks_in_fragments;
 
         graphLike graph;
+        graphLike scoresMap; //std::map<score, std::vector <std::pair<to, from>>>
 
         std::string packed_result;
         std::string result;
@@ -244,11 +220,11 @@ int main(int argc, char**argv) {
 		fragments_fin.close();
 
         /* bit pack fragments */
-        for(std::string fragment: fragments) {
-			bit_pack(packed_fragment, num_blocks_in_fragment, fragment);
-			packed_fragments.push_back(packed_fragment);
-			num_blocks_in_fragments.push_back(num_blocks_in_fragment);
-		}
+        // for(std::string fragment: fragments) {
+		// 	bit_pack(packed_fragment, num_blocks_in_fragment, fragment);
+		// 	packed_fragments.push_back(packed_fragment);
+		// 	num_blocks_in_fragments.push_back(num_blocks_in_fragment);
+		// }
 
         /* Sanity Check */
         // for(unsigned long i=0; i < packed_fragments.size(); ++i) {
@@ -267,8 +243,8 @@ int main(int argc, char**argv) {
 
 
         /* Output */
-        result = "GATTACCAATTACCAGGA"; /* TODO: DOTHIS" */
-        std::cout << result << std::endl;
+        // result = "GATTACCAATTACCAGGA"; /* TODO: DOTHIS" */
+        // std::cout << result << std::endl;
         return 0;
     }
     std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
