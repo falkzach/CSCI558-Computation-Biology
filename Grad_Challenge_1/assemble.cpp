@@ -43,6 +43,8 @@
 #include <utility>
 #include <vector>
 
+#include <omp.h>
+
 /* graphLike is a map of node id's to vectors of pairs of node id and weight */
 using graphLike = std::map<int, std::vector<std::pair<int, int>>>;
 
@@ -145,53 +147,8 @@ void add_score_edge(graphLike & scoreGraph, const int score, const int A, const 
     // std::cout << "New Score Edge: " << A << " -> " << B << " score: " << score << std::endl;
 }
 
-void build_edge(const std::vector<std::string> fragments, const int I, const int J, graphLike & graph, graphLike & scoreGraph) {
-    int weightI = 0;  //suffix of I prefix of J I -> J
-    int weightJ = 0;  //suffix of J prefix of I J -> I
-
-    for (int i = 0, j=fragments[J].length() - 1;
-        i < fragments[I].length() && j >= 0;
-        ++i, --j) {
-            weightJ = 0;
-            for (int c = 0, d = j; c < i && d < fragments[J].length(); ++c, ++d) {
-                if(fragments[I][c] == fragments [J][d]) {
-                    ++weightJ;
-                } else {
-                    break;
-                }
-            }
-    }
-
-    if (weightJ > 0) {
-        std::pair<int, int> edge = {I, weightJ};
-        graph[J].push_back(edge);
-        add_score_edge(scoreGraph, weightJ, J, I);
-        // std::cout << "New Edge: " << J << " -> " << I << " weightJ: " << weightJ << std::endl;
-    }
-
-    for (int i=fragments[I].length() -1, j=0;
-        i >=0 && j < fragments[J].length();
-        --i, ++j) {
-            for(int c = i, d = 0; c < fragments[I].length() && d < j; ++c, ++d) {
-                if(fragments[I][c] == fragments [J][d]) {
-                    ++weightI;
-                } else {
-                    break;
-                }
-            }
-    }
-
-    if (weightI > 0) {
-        std::pair<int, int> edge = {J, weightI};
-        graph[I].push_back(edge);
-        add_score_edge(scoreGraph, weightI, I, J);
-        // std::cout << "New Edge: " << I << " -> " << J << " weightI: " << weightI << std::endl;
-    }
-
-}
-
 /* String version TODO: bitpack*/
-void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & scores) {
+void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & scoreGraph) {
     /* put all nodes in the graph with no edges */
     for(unsigned long i=0; i < fragments.size(); ++i) {
         std::vector<std::pair<int, int>> adjacencies;
@@ -199,9 +156,57 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
     }
 
     /* build out edges of graph */
-    for(unsigned long i=0; i < fragments.size(); ++i) {
-        for (unsigned long j=i+1; j < fragments.size(); ++j) {
-                build_edge(fragments,i,j,graph,scores);
+    unsigned long I, J;
+    // #pragma omp parallel for private(J)
+    for(I=0; I < fragments.size(); ++I) {
+        for (J=I+1; J < fragments.size(); ++J) {
+                int weightI = 0;  //suffix of I prefix of J I -> J
+                int weightJ = 0;  //suffix of J prefix of I J -> I
+
+                for (int i = 0, j=fragments[J].length() - 1;
+                    i < fragments[I].length() && j >= 0;
+                    ++i, --j) {
+                        weightJ = 0;
+                        for (int c = 0, d = j; c < i && d < fragments[J].length(); ++c, ++d) {
+                            if(fragments[I][c] == fragments [J][d]) {
+                                ++weightJ;
+                            } else {
+                                break;
+                            }
+                        }
+                }
+
+                if (weightJ > 0) {
+                    std::pair<int, int> edge = {I, weightJ};
+                    /* should not need a single here since J is shared */
+                    graph[J].push_back(edge);
+                    // #pragma omp single
+                    add_score_edge(scoreGraph, weightJ, J, I);
+                    // std::cout << "New Edge: " << J << " -> " << I << " weightJ: " << weightJ << std::endl;
+                }
+
+                for (int i=fragments[I].length() -1, j=0;
+                    i >=0 && j < fragments[J].length();
+                    --i, ++j) {
+                        weightI = 0;
+                        for(int c = i, d = 0; c < fragments[I].length() && d < j; ++c, ++d) {
+                            if(fragments[I][c] == fragments [J][d]) {
+                                ++weightI;
+                            } else {
+                                break;
+                            }
+                        }
+                }
+
+                if (weightI > 0) {
+                    std::pair<int, int> edge = {J, weightI};
+                    // #pragma omp single
+                    graph[I].push_back(edge);
+                    // #pragma omp single
+                    add_score_edge(scoreGraph, weightI, I, J);
+                    // std::cout << "New Edge: " << I << " -> " << J << " weightI: " << weightI << std::endl;
+                }
+
         }
     }
 }
@@ -215,24 +220,54 @@ void print_adjacency_lists(graphLike & graph){
         for (auto pair=it->second.begin(); pair!=it->second.end(); ++pair) {
             std::cout << pair->first << "(" << pair->second << "),\t";
         }
+        std::cout << "degree: " << it->second.size();
 
         std::cout << std::endl;
     }
 }
 
 void merge_nodes(const int score, const int S, const int P, graphLike & graph, std::string & result) {
+    //todo: somehow smash nodes into eachother? do i need reverse edges to do this effectivly?
 
 }
 
+void append_prefix_string(std::string & result, std:: string & P, int overlap) {
+    std::cout << "Overlap: " << overlap << std::endl;
+    std::cout << "Concatinating " << P << " with " << result << std::endl;
+    result = P.substr(0, overlap - 1) + result;
+    std::cout << "Result: " << result << std::endl;
+}
 
+void append_suffix_string(std::string & result, std::string & S, int overlap) {
+    std::cout << "Overlap: " << overlap << std::endl;
+    std::cout << "Concatinating " << result << " with " << S << std::endl;
+    result += S.substr(overlap, S.length());
+    std::cout << "Result: " << result << std::endl;
+}
 
 
 /* Greedily collapse the graph to a single node */
-void colapse_graph(graphLike & graph, graphLike & scoreGraph) {
+std::string colapse_graph(graphLike & graph, graphLike & scoreGraph, std::vector<std::string> & fragments) {
+    std::string result;
+    std::map<int, int> visited;
+    for(int i=0; i < graph.size(); ++i) {
+        visited[i] = 0;
+    }
+
+    int overlap = scoreGraph.rbegin()->first;
+    std::pair<int, int> start_edge = scoreGraph.rbegin()->second[0];
+    std::cout << "start node: " << fragments[start_edge.first] << std::endl;
+    std::cout << "next node: " << fragments[start_edge.second] << std::endl;
+    result = fragments[start_edge.first];
+    visited[start_edge.first] = 1;
+
+    append_suffix_string(result, fragments[start_edge.second], overlap);
     for (auto rit=scoreGraph.rbegin(); rit!=scoreGraph.rend(); ++rit) {
-        std::cout << "Score: " << rit->first << std::endl;
+        std::cout << "Score: " << rit->first << " count: " << rit->second.size() << std::endl;
         //TODO: ...
     }
+
+    return result;
 }
 
 int main(int argc, char**argv) {
@@ -262,7 +297,7 @@ int main(int argc, char**argv) {
 		fragments_fin.close();
 
         //TODO: maybe? idk
-        sort(fragments.begin(), fragments.end());
+        // sort(fragments.begin(), fragments.end());
 
         /* bit pack fragments */
         // for(std::string fragment: fragments) {
@@ -272,26 +307,35 @@ int main(int argc, char**argv) {
 		// }
 
         /* Sanity Check */
-        for(unsigned long i=0; i < fragments.size(); ++i) {
-            std::cout << "original: " << fragments[i] << std::endl;
+        // for(unsigned long i=0; i < fragments.size(); ++i) {
+        //     std::cout << "original: " << fragments[i] << std::endl;
             // print_bitpacked_string(packed_fragments[i], num_blocks_in_fragments[i]);
             
             // std::string unpacked;
             // unpacked = unpack(packed_fragments[i], num_blocks_in_fragments[i], fragment_lengths[i]);
             // std::cout << "unpacked: " << unpacked << std::endl << std::endl;
-        }
+        // }
 
         /* Build Graph */
         build_graph(fragments, graph, scoresGraph);
 
-        print_adjacency_lists(graph);
+        // print_adjacency_lists(graph);
         
         /* Assemble... */
-        colapse_graph(graph, scoresGraph);
+        result = colapse_graph(graph, scoresGraph, fragments);
+
+        // std::string a = "ACT";
+        // std::string b = "CTG";
+        // int overlaping = 2;
+        // append_suffix_string(a,b, overlaping);
+
+        // b = "GAC";
+        // append_prefix_string(a,b,overlaping);
+
 
         /* Output */
         // result = "GATTACCAATTACCAGGA"; /* TODO: DOTHIS" */
-        // std::cout << result << std::endl;
+        std::cout << result << std::endl;
         return 0;
     }
     std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
