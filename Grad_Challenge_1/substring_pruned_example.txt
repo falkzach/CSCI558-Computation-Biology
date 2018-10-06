@@ -1,3 +1,4 @@
+fragments after pruning substrings:
 ATTACCAATT
 TACCAGGA
 GATTA
@@ -5,8 +6,7 @@ CAATTACC
 ACCAATTAC
 AATTACCAGG
 
-GATTACAATTCGG
-
+fragments manually aranged according to original string:
 GATTACCAATTACCAGGA
 GATTA
  ATTACCAATT
@@ -14,3 +14,12 @@ GATTA
       CAATTACC
        AATTACCAGG
           TACCAGGA
+
+results of my assembling algorithm with traces printed:
+GATTA
+ ATTACCAATT
+    ACCAATTAC
+      CAATTACC
+       AATTACCAGG
+          TACCAGGA
+GATTACCAATTACCAGGA

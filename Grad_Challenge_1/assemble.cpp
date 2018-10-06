@@ -168,11 +168,10 @@ void print_adjacency_lists(graphLike & graph){
 
 void append_prefix_string(std::string & result, std:: string & P, int overlap) {
     result = P.substr(0, overlap) + result;
-    std::cout << result << std::endl;
 }
 
 void append_suffix_string(std::string & result, std::string & S, int overlap) {
-    result += S.substr(overlap + 1, S.length());
+    result += S.substr(overlap, S.length());
 }
 
 int all_set(std::map<int, int> visited) {
@@ -181,43 +180,7 @@ int all_set(std::map<int, int> visited) {
     return n_set == visited.size();
 }
 
-/* Greedily collapse the graph to a single node */
-std::string colapse_graph(graphLike & graph, graphLike & scoreGraph, std::vector<std::string> & fragments) {
-    std::string result;
-    int result_head, result_tail;
-    std::map<int, int> visited;
-    for(int i=0; i < graph.size(); ++i) {
-        visited[i] = 0;
-    }
-
-    // result = fragments[edge.first];
-    for (auto score_rit=scoreGraph.rbegin(); score_rit!=scoreGraph.rend(); ++score_rit) {
-        std::cout << "Score: " << score_rit->first << " count: " << score_rit->second.size() << std::endl;
-        int overlap = score_rit->first;
-        for(int i=0; i < score_rit->second.size(); ++i) {
-            std::pair<int, int> edge = score_rit->second[i];
-            visited[edge.first] = 1;
-            if (all_set(visited) == 0) {
-                edge  = score_rit->second[i];
-                if(edge.second == result_head) {
-                    std::cout << "a: " << fragments[edge.first] << std::endl;
-                    std::cout << "r: " << result << std::endl;
-                    append_prefix_string(result, fragments[edge.second], overlap);
-                } else if(visited.count(edge.first) == 0) {
-                    std::cout << "r: " << result << std::endl;
-                    std::cout << "b: " << fragments[edge.second] << std::endl;
-                    append_suffix_string(result, fragments[edge.second], overlap);
-                }
-            } else {
-                break;
-            }
-        }
-        if(all_set(visited)) { break; }
-    }
-
-    return result;
-}
-
+/* create a greedy hamiltonian(?) path and walk it */
 std::string walk_graph(graphLike & graph, graphLike & scoreGraph, std::vector<std::string> & fragments) {
     std::string result;
     std::map<int, int> path;
@@ -249,20 +212,18 @@ std::string walk_graph(graphLike & graph, graphLike & scoreGraph, std::vector<st
             break;
         }
     }
-    // std::cout << "Start Node: " << current_node << std::endl;
     result = fragments[current_node];
-    std::cout << result << std::endl;
+    // std::cout << result << std::endl;
     int overlap; 
     int offset = result.length() - overlaps[current_node]; 
     while (path.count(current_node) > 0) {
         overlap = overlaps[current_node];
-        for(int o=0; o<offset;++o) { std::cout << " "; }
-        std::cout << fragments[path[current_node]] << std::endl;
+        // for(int o=0; o<offset;++o) { std::cout << " "; }
+        // std::cout << fragments[path[current_node]] << std::endl;
         int append_node = current_node;
         current_node = path[current_node];
         offset += fragments[current_node].length() - overlaps[current_node];
-        append_suffix_string(result, fragments[current_node], 0); //TODO: fix overlap lookups!!!
-        // std::cout << result << std::endl;
+        append_suffix_string(result, fragments[current_node], overlaps[append_node]);
     }
 
     return result;
@@ -301,11 +262,9 @@ int main(int argc, char**argv) {
         // print_adjacency_lists(reverseGraph);
         
         /* Assemble... */
-        // result = colapse_graph(graph, scoresGraph, fragments);
         result = walk_graph(graph, scoresGraph, fragments);
 
         /* Output */
-        // result = "GATTACCAATTACCAGGA"; /* TODO: DOTHIS" */
         std::cout << result << std::endl;
         return 0;
     }
