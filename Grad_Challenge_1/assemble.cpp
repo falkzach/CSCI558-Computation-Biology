@@ -101,8 +101,6 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
     // #pragma omp parallel for private(J, weightI, weightJ, bestI, bestJ) shared(I)
     for(I=0; I < fragments.size(); ++I) {
         for (J=I+1; J < fragments.size(); ++J) {
-            std::cout<<"I,J: " << I << ", " << J << std::endl;
-
             int weightI = 0;  //suffix of I prefix of J I -> J
             int weightJ = 0;  //suffix of J prefix of I J -> I
             int bestI = 0;
@@ -168,11 +166,6 @@ void print_adjacency_lists(graphLike & graph){
     }
 }
 
-void merge_nodes(const int score, const int S, const int P, graphLike & graph, std::string & result) {
-    //todo: somehow smash nodes into eachother? do i need reverse edges to do this effectivly?
-
-}
-
 void append_prefix_string(std::string & result, std:: string & P, int overlap) {
     result = P.substr(0, overlap) + result;
     std::cout << result << std::endl;
@@ -225,6 +218,56 @@ std::string colapse_graph(graphLike & graph, graphLike & scoreGraph, std::vector
     return result;
 }
 
+std::string walk_graph(graphLike & graph, graphLike & scoreGraph, std::vector<std::string> & fragments) {
+    std::string result;
+    std::map<int, int> path;
+    std::map<int, int> overlaps;
+    std::set<int> visited;
+    int current_node;
+
+    for (auto score_rit=scoreGraph.rbegin(); score_rit!=scoreGraph.rend(); ++score_rit) {
+        int overlap = score_rit->first;
+        for(int i=0; i < score_rit->second.size(); ++i) {
+            std::pair<int, int> edge = score_rit->second[i];
+            if(visited.count(edge.second) == 0  && path.count(edge.first) == 0) {
+                visited.insert(edge.second);
+                path[edge.first] = edge.second;
+                overlaps[edge.first] = overlap;
+            }
+        }
+    }
+
+    // std::cout << "Path" << std::endl;
+    // for(std::map<int,int>::iterator it=path.begin(); it!=path.end(); it++) {
+    //     std::cout << it->first << " -> " << it->second << std::endl;
+    // }
+
+    
+    for(int i=0; i< fragments.size(); ++i) {
+        if(visited.count(i) == 0) {
+            current_node = i;
+            break;
+        }
+    }
+    // std::cout << "Start Node: " << current_node << std::endl;
+    result = fragments[current_node];
+    std::cout << result << std::endl;
+    int overlap; 
+    int offset = result.length() - overlaps[current_node]; 
+    while (path.count(current_node) > 0) {
+        overlap = overlaps[current_node];
+        for(int o=0; o<offset;++o) { std::cout << " "; }
+        std::cout << fragments[path[current_node]] << std::endl;
+        int append_node = current_node;
+        current_node = path[current_node];
+        offset += fragments[current_node].length() - overlaps[current_node];
+        append_suffix_string(result, fragments[current_node], 0); //TODO: fix overlap lookups!!!
+        // std::cout << result << std::endl;
+    }
+
+    return result;
+}
+
 int main(int argc, char**argv) {
 
     if (argc == 2) {
@@ -248,17 +291,18 @@ int main(int argc, char**argv) {
         /* prune pure substrings that add no new information */
         prune_substring_fragments(fragments);
 
-        std::cout<<"pruned"<<std::endl;
-        std::cout<<"n: " << fragments.size() << std::endl;
+        // std::cout<<"pruned"<<std::endl;
+        // std::cout<<"n: " << fragments.size() << std::endl;
 
         /* Build Graph */
         build_graph(fragments, graph, reverseGraph, scoresGraph);
 
-        print_adjacency_lists(graph);
-        print_adjacency_lists(reverseGraph);
+        // print_adjacency_lists(graph);
+        // print_adjacency_lists(reverseGraph);
         
         /* Assemble... */
-        result = colapse_graph(graph, scoresGraph, fragments);
+        // result = colapse_graph(graph, scoresGraph, fragments);
+        result = walk_graph(graph, scoresGraph, fragments);
 
         /* Output */
         // result = "GATTACCAATTACCAGGA"; /* TODO: DOTHIS" */
