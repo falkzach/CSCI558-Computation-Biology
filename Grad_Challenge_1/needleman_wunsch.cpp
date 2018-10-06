@@ -66,7 +66,7 @@ float*create_matrix(const std::string & seq_a, const std::string & seq_b) {
   init_first_row(matrix, num_cols);
   init_first_column(matrix, num_rows, num_cols);
 
-  for (int i=1; i<num_cols; ++i)
+  for (int i=1; i<num_rows; ++i)
     stripe_row(seq_a, seq_b, matrix, num_cols, i);
 
   return matrix;
@@ -81,7 +81,8 @@ void needleman_wunsch(std::string seq_a, std::string seq_b) {
 
   for (unsigned long i=0; i<=seq_a.size(); ++i) {
     for (unsigned long j=0; j<=seq_b.size(); ++j)
-      std::cout << index(starting_mat_reversed, seq_b.size()+1, seq_a.size()-i, seq_b.size()-j) + index(ending_mat, seq_b.size()+1, i, j) << "\t";
+      //std::cout << index(starting_mat_reversed, seq_b.size()+1, seq_a.size()-i, seq_b.size()-j) + index(ending_mat, seq_b.size()+1, i, j) << "\t";
+      std::cout << index(ending_mat, seq_b.size()+1, i, j) << "\t";
     std::cout << std::endl;
   }
 
