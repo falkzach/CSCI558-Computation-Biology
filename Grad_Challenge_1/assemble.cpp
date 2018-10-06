@@ -233,16 +233,18 @@ void merge_nodes(const int score, const int S, const int P, graphLike & graph, s
 
 void append_prefix_string(std::string & result, std:: string & P, int overlap) {
     std::cout << "Overlap: " << overlap << std::endl;
-    std::cout << "Concatinating " << P << " with " << result << std::endl;
+    // std::cout << "Concatinating " << P << " with " << result << std::endl;
     result = P.substr(0, overlap - 1) + result;
-    std::cout << "Result: " << result << std::endl;
+    std::cout << result << std::endl;
 }
 
 void append_suffix_string(std::string & result, std::string & S, int overlap) {
     std::cout << "Overlap: " << overlap << std::endl;
-    std::cout << "Concatinating " << result << " with " << S << std::endl;
+    std::cout << "cur res: " << result << std::endl;
+    std::cout << "next fr: " << S << std::endl;
     result += S.substr(overlap, S.length());
-    std::cout << "Result: " << result << std::endl;
+    std::cout << "new res: " << result << std::endl;
+    std::cout << result << std::endl;
 }
 
 
@@ -258,14 +260,14 @@ std::string colapse_graph(graphLike & graph, graphLike & scoreGraph, std::vector
     std::pair<int, int> start_edge = scoreGraph.rbegin()->second[0];
     std::cout << "start node: " << fragments[start_edge.first] << std::endl;
     std::cout << "next node: " << fragments[start_edge.second] << std::endl;
-    result = fragments[start_edge.first];
+    result = fragments[start_edge.first].substr(0,fragments[start_edge.first].length() - 1); //TODO: handle newlines!
     visited[start_edge.first] = 1;
 
-    append_suffix_string(result, fragments[start_edge.second], overlap);
-    for (auto rit=scoreGraph.rbegin(); rit!=scoreGraph.rend(); ++rit) {
-        std::cout << "Score: " << rit->first << " count: " << rit->second.size() << std::endl;
-        //TODO: ...
-    }
+    append_suffix_string(result, fragments[start_edge.second], overlap);  //TODO: fix!
+    // for (auto rit=scoreGraph.rbegin(); rit!=scoreGraph.rend(); ++rit) {
+    //     std::cout << "Score: " << rit->first << " count: " << rit->second.size() << std::endl;
+    //     //TODO: ...
+    // }
 
     return result;
 }
