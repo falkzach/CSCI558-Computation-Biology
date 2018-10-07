@@ -47,9 +47,24 @@
 
 #include <omp.h>
 
+/* TODO: change the vector to a map? */
 /* graphLike is a map of node id's to vectors of pairs of node id and weight */
 using graphLike = std::map<int, std::vector<std::pair<int, int>>>;
 
+/* read each line from the source file in as a fragment, cleaning newlines and returns */
+void read_fragments(std::vector<std::string> & fragments, const std::string & path) {
+        std::string fragment;
+        std::ifstream fragments_fin(path);
+        while(std::getline(fragments_fin, fragment)) {
+            /* clean newlines and returns */
+            fragment.erase(std::remove(fragment.begin(), fragment.end(), '\n'), fragment.end());
+            fragment.erase(std::remove(fragment.begin(), fragment.end(), '\r'), fragment.end());
+            fragments.push_back(fragment);
+        }
+        fragments_fin.close();
+}
+
+/* remove all fragments that are substrings of other fragments */
 void prune_substring_fragments(std::vector<std::string> & fragments) {
     std::set<int> prune_fragments;
     int I, J;
@@ -75,6 +90,7 @@ void prune_substring_fragments(std::vector<std::string> & fragments) {
     }
 }
 
+/* add an edge to the scoreGraph that points to the edge in the graph */
 void add_score_edge(graphLike & scoreGraph, const int score, const int A, const int B) {
     #pragma omp critical
     if (scoreGraph.count(score) == 0) {
@@ -86,9 +102,12 @@ void add_score_edge(graphLike & scoreGraph, const int score, const int A, const 
     scoreGraph[score].push_back(edge);
 }
 
-/* String version TODO: bitpack*/
+/**
+ * build out a directed graph where an edge represents an overlap between the 2 strings
+ * that is, the source node has a sufix that is a prefix to the destination node with some overlap
+**/
 void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & scoreGraph) {
-    int min_overlap = 3;
+    int min_overlap = 3;//TODO: BUG: a min overlap of 2 leads to a core dump.
     /* put all nodes in the graph with no edges */
     #pragma omp parallel for
     for(unsigned long i=0; i < fragments.size(); ++i) {
@@ -116,6 +135,7 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                             break;
                         }
                     }
+                    /* keep the best scoring overlap */
                     bestJ = std::max(bestJ, weightJ);
             }
 
@@ -129,8 +149,11 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                             break;
                         }
                     }
+                    /* keep the best scoring overlap */
                     bestI = std::max(bestI, weightI);
             }
+
+            /* add edges to graph */
 
             if (bestJ >= min_overlap) {
                 std::pair<int, int> edge = {I, bestJ};
@@ -152,37 +175,29 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
     }
 }
 
+/* a utility function to output a graphs adjacency lists */
 void print_adjacency_lists(graphLike & graph){
-    std::cout << "Graph Adjacency Lists" << std::endl;
-
     for (auto it=graph.begin(); it!=graph.end(); ++it) {
         std::cout << it->first << ":\t";
-
         for (auto pair=it->second.begin(); pair!=it->second.end(); ++pair) {
             std::cout << pair->first << "(" << pair->second << "),\t";
         }
-        // std::cout << "degree: " << it->second.size();
-
         std::cout << std::endl;
     }
 }
 
+/* append a fragment to the front of the result with some overlap, not used*/
 void append_prefix_string(std::string & result, std:: string & P, int overlap) {
     result = P.substr(0, overlap) + result;
 }
 
+/* append a fragment to the end of the result with some overlap*/
 void append_suffix_string(std::string & result, std::string & S, int overlap) {
     result += S.substr(overlap, S.length());
 }
 
-int all_set(std::map<int, int> visited) {
-    int n_set = 0;
-    n_set = std::accumulate(visited.begin(), visited.end(), 0, [] (int value, const std::map<int, int>::value_type& p) { return value + p.second; });
-    return n_set == visited.size();
-}
-
-/* create a greedy hamiltonian(?) path and walk it */
-std::string walk_graph(graphLike & graph, graphLike & scoreGraph, std::vector<std::string> & fragments) {
+/* create a greedy Hamiltonian(?) path and walk it */
+std::string walk_graph(std::vector<std::string> & fragments, graphLike & graph, graphLike & scoreGraph) {
     std::string result;
     std::map<int, int> path;
     std::map<int, int> overlaps;
@@ -201,12 +216,6 @@ std::string walk_graph(graphLike & graph, graphLike & scoreGraph, std::vector<st
         }
     }
 
-    // std::cout << "Path" << std::endl;
-    // for(std::map<int,int>::iterator it=path.begin(); it!=path.end(); it++) {
-    //     std::cout << it->first << " -> " << it->second << std::endl;
-    // }
-
-    
     for(int i=0; i< fragments.size(); ++i) {
         if(visited.count(i) == 0) {
             current_node = i;
@@ -214,7 +223,7 @@ std::string walk_graph(graphLike & graph, graphLike & scoreGraph, std::vector<st
         }
     }
     result = fragments[current_node];
-    // std::cout << result << std::endl;
+
     int overlap; 
     int offset = result.length() - overlaps[current_node]; 
     while (path.count(current_node) > 0) {
@@ -235,26 +244,14 @@ int main(int argc, char**argv) {
     if (argc == 2) {
         std::vector<std::string> fragments;
         graphLike graph;
-        graphLike reverseGraph;
         graphLike scoresGraph; //std::map<score, std::vector <std::pair<to, from>>>
         std::string result;
 
         /* read fragments */
-        std::string fragment;
-        std::ifstream fragments_fin(argv[1]);
-        while(std::getline(fragments_fin, fragment)) {
-            /* clean newlines and returns */
-            fragment.erase(std::remove(fragment.begin(), fragment.end(), '\n'), fragment.end());
-            fragment.erase(std::remove(fragment.begin(), fragment.end(), '\r'), fragment.end());
-            fragments.push_back(fragment);
-        }
-        fragments_fin.close();
+        read_fragments(fragments, argv[1]);
 
-        /* prune pure substrings that add no new information */
+        /* prune pure substrings as they add no new information (Assumption) */
         prune_substring_fragments(fragments);
-
-        // std::cout<<"pruned"<<std::endl;
-        // std::cout<<"n: " << fragments.size() << std::endl;
 
         /* Build Graph */
         build_graph(fragments, graph, scoresGraph);
@@ -262,7 +259,7 @@ int main(int argc, char**argv) {
         // print_adjacency_lists(graph);
         
         /* Assemble... */
-        result = walk_graph(graph, scoresGraph, fragments);
+        result = walk_graph(fragments, graph, scoresGraph);
 
         /* Output */
         std::cout << result << std::endl;
