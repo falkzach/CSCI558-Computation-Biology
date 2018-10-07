@@ -53,7 +53,7 @@ using graphLike = std::map<int, std::vector<std::pair<int, int>>>;
 void prune_substring_fragments(std::vector<std::string> & fragments) {
     std::set<int> prune_fragments;
     int I, J;
-    #pragma omp parallel for private(J)
+    #pragma omp parallel for private(J) schedule(dynamic, 3)
     for(I=0; I < fragments.size(); ++I) {
         for (J=I+1; J < fragments.size(); ++J) {
             if(fragments[I].length() <= fragments[J].length()) {
@@ -73,10 +73,6 @@ void prune_substring_fragments(std::vector<std::string> & fragments) {
         int id = *rit;
         fragments.erase(fragments.begin() + id);
     }
-
-    // for(int I=0; I < fragments.size(); ++I) {
-    //     std::cout<<fragments[I]<<std::endl;
-    // }
 }
 
 void add_score_edge(graphLike & scoreGraph, const int score, const int A, const int B) {
@@ -91,20 +87,19 @@ void add_score_edge(graphLike & scoreGraph, const int score, const int A, const 
 }
 
 /* String version TODO: bitpack*/
-void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & reverseGraph, graphLike & scoreGraph) {
+void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & scoreGraph) {
     int min_overlap = 3;
     /* put all nodes in the graph with no edges */
     #pragma omp parallel for
     for(unsigned long i=0; i < fragments.size(); ++i) {
         std::vector<std::pair<int, int>> adjacencies;
-        std::vector<std::pair<int, int>> reverseAdjacencies;
+        #pragma omp critical
         graph[i] = adjacencies;
-        reverseGraph[i] = reverseAdjacencies;
     }
 
     unsigned long I, J;
     /* build out edges of graph */
-    #pragma omp parallel for private(J)
+    #pragma omp parallel for private(J) schedule(dynamic, 3)
     for(I=0; I < fragments.size(); ++I) {
         for (J=I+1; J < fragments.size(); ++J) {
             int weightI = 0;  //suffix of I prefix of J I -> J
@@ -142,8 +137,6 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                 std::pair<int, int> reverseEdge = {J, bestJ};
                 #pragma omp critical
                 graph[J].push_back(edge);
-                #pragma omp critical
-                reverseGraph[I].push_back(reverseEdge);
                 add_score_edge(scoreGraph, bestJ, J, I);
             }
 
@@ -152,8 +145,6 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                 std::pair<int, int> reverseEdge = {I, bestI};
                 #pragma omp critical
                 graph[I].push_back(edge);
-                #pragma omp critical
-                reverseGraph[J].push_back(reverseEdge);
                 add_score_edge(scoreGraph, bestI, I, J);
             }
 
@@ -266,10 +257,9 @@ int main(int argc, char**argv) {
         // std::cout<<"n: " << fragments.size() << std::endl;
 
         /* Build Graph */
-        build_graph(fragments, graph, reverseGraph, scoresGraph);
+        build_graph(fragments, graph, scoresGraph);
 
         // print_adjacency_lists(graph);
-        // print_adjacency_lists(reverseGraph);
         
         /* Assemble... */
         result = walk_graph(graph, scoresGraph, fragments);
