@@ -52,14 +52,18 @@ using graphLike = std::map<int, std::vector<std::pair<int, int>>>;
 
 void prune_substring_fragments(std::vector<std::string> & fragments) {
     std::set<int> prune_fragments;
-    for(int I=0; I < fragments.size(); ++I) {
-        for (int J=I+1; J < fragments.size(); ++J) {
+    int I, J;
+    #pragma omp parallel for private(J)
+    for(I=0; I < fragments.size(); ++I) {
+        for (J=I+1; J < fragments.size(); ++J) {
             if(fragments[I].length() <= fragments[J].length()) {
                 if(fragments[J].find(fragments[I]) != std::string::npos) { // I is substring of J, erase I
+                    #pragma omp critical
                     prune_fragments.insert(I);
                 }
             } else {
                 if(fragments[I].find(fragments[J]) != std::string::npos) { // J is substring of I, erase J
+                    #pragma omp critical
                     prune_fragments.insert(J);
                 }
             }
@@ -76,13 +80,14 @@ void prune_substring_fragments(std::vector<std::string> & fragments) {
 }
 
 void add_score_edge(graphLike & scoreGraph, const int score, const int A, const int B) {
+    #pragma omp critical
     if (scoreGraph.count(score) == 0) {
         std::vector<std::pair<int, int>> edges;
         scoreGraph[score] = edges;
     }
     std::pair<int, int> edge = {A, B};
+    #pragma omp critical
     scoreGraph[score].push_back(edge);
-    // std::cout << "New Score Edge: " << A << " -> " << B << " score: " << score << std::endl;
 }
 
 /* String version TODO: bitpack*/
@@ -132,20 +137,22 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                     bestI = std::max(bestI, weightI);
             }
 
-            #pragma omp critical
             if (bestJ >= min_overlap) {
                 std::pair<int, int> edge = {I, bestJ};
                 std::pair<int, int> reverseEdge = {J, bestJ};
+                #pragma omp critical
                 graph[J].push_back(edge);
+                #pragma omp critical
                 reverseGraph[I].push_back(reverseEdge);
                 add_score_edge(scoreGraph, bestJ, J, I);
             }
 
-            #pragma omp critical
             if (bestI >= min_overlap) {
                 std::pair<int, int> edge = {J, bestI};
                 std::pair<int, int> reverseEdge = {I, bestI};
+                #pragma omp critical
                 graph[I].push_back(edge);
+                #pragma omp critical
                 reverseGraph[J].push_back(reverseEdge);
                 add_score_edge(scoreGraph, bestI, I, J);
             }
