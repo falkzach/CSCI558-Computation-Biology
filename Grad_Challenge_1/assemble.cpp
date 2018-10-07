@@ -1,5 +1,5 @@
-/** 
- * GRAD CHALLENGE 1 (GENOME ASSEMBLY): Create a program to try to assemble a linear chromosome (a string of 'G', 'A', 'T', and 'C' [uppercase only] using only short reads). Your program must be entirely original and must not use any external libraries (except for numpy in python or the C++ standard library in C++). Your program must consist of a single source file (if using python) or compile from a single source file without any extra compilation flags (if using C++). C++ programs will be compiled with -std=c++11, so using the C++11 standard is fine. Regardless of language, your program should accept one command line parameter: the name of a text file containing all of the short reads (one short read per line). Your program should output only one thing: the string ('G', 'A', 'T', and 'C' [uppercase only]) that you believe was used to generate the reads (whitespace in your output does not matter); this is your genome assembly. Your submission must run in <10 minutes on <10000 fragments each with length >10bp and <100bp.
+/**
+ * GRAD CHALLENGE 1 (GENOME ASSEMBLY): Create a program to try to assemble a linear chromosome (a string of 'G', 'A', 'T', and 'C' [uppercase only] using only short reads). Your program must be entirely original and must not use any external libraries (except for numpy in python or the C++ standard library in C++). Your program must consist of a single source file (if using python) or compile from a single source file without any extra compilation flags (if using C++). C++ programs will be compiled with -std=c++11 (and -O3 and -march=native and -fopenmp), so using the C++11 standard is fine. Regardless of language, your program should accept one command line parameter: the name of a text file containing all of the short reads (one short read per line). Your program should output only one thing: the string ('G', 'A', 'T', and 'C' [uppercase only]) that you believe was used to generate the reads (whitespace in your output does not matter); this is your genome assembly. Your submission must run in <10 minutes on <10000 fragments each with length >10bp and <100bp.
  * 
  * Here is the program that will be used to generate short reads: make_fragments.py
  * To learn how to use make_fragments.py, run it without arguments.
@@ -29,10 +29,11 @@
  * AATTACCAGG
  * Your program is supposed to read a file of the above output and try to infer the original string, ``GATTACCAATTACCAGGA''.
  * 
- * The student with the best alignment to my secret, original string will be decided using Needleman-Wunsch with parameters: gap=-4, mismatch=-2, match=1.
+ * The student with the best alignment to my secret, original string will be decided using Needleman-Wunsch with parameters: gap=-4, mismatch=-2, match=1. Y.
+ * 
+ * If you want to improve your performance when testing, here is a C++ Needleman-Wunsch implementation and a python program to draw a heatmap from your pass-through score matrix (which the C++ program outputs to stdout).
  * 
  * DUE DATE: October 8, 2018
- * 
 **/
 
 #include <algorithm>
@@ -88,7 +89,7 @@ void add_score_edge(graphLike & scoreGraph, const int score, const int A, const 
 void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & reverseGraph, graphLike & scoreGraph) {
     int min_overlap = 3;
     /* put all nodes in the graph with no edges */
-    // #pragma omp parallel for
+    #pragma omp parallel for
     for(unsigned long i=0; i < fragments.size(); ++i) {
         std::vector<std::pair<int, int>> adjacencies;
         std::vector<std::pair<int, int>> reverseAdjacencies;
@@ -98,7 +99,7 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
 
     unsigned long I, J;
     /* build out edges of graph */
-    // #pragma omp parallel for private(J, weightI, weightJ, bestI, bestJ) shared(I)
+    #pragma omp parallel for private(J)
     for(I=0; I < fragments.size(); ++I) {
         for (J=I+1; J < fragments.size(); ++J) {
             int weightI = 0;  //suffix of I prefix of J I -> J
@@ -131,6 +132,7 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                     bestI = std::max(bestI, weightI);
             }
 
+            #pragma omp critical
             if (bestJ >= min_overlap) {
                 std::pair<int, int> edge = {I, bestJ};
                 std::pair<int, int> reverseEdge = {J, bestJ};
@@ -139,6 +141,7 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                 add_score_edge(scoreGraph, bestJ, J, I);
             }
 
+            #pragma omp critical
             if (bestI >= min_overlap) {
                 std::pair<int, int> edge = {J, bestI};
                 std::pair<int, int> reverseEdge = {I, bestI};
