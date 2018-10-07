@@ -37,8 +37,8 @@
 **/
 
 #include <algorithm>
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <map>
 #include <set>
 #include <string>
@@ -47,7 +47,9 @@
 
 #include <omp.h>
 
-/* TODO: change the vector to a map? */
+#define DISPLAY_ALIGNMENTS 0
+#define MIN_FRAGMENT_OVERLAP 3 //TODO: BUG: a min overlap of 2 leads to a core dump.
+
 /* graphLike is a map of node id's to vectors of pairs of node id and weight */
 using graphLike = std::map<int, std::vector<std::pair<int, int>>>;
 
@@ -91,7 +93,7 @@ void prune_substring_fragments(std::vector<std::string> & fragments) {
 }
 
 /* add an edge to the scoreGraph that points to the edge in the graph */
-void add_score_edge(graphLike & scoreGraph, const int score, const int A, const int B) {
+void add_score_edge(graphLike & scoreGraph, const int score, const int & A, const int & B) {
     #pragma omp critical
     if (scoreGraph.count(score) == 0) {
         std::vector<std::pair<int, int>> edges;
@@ -107,7 +109,6 @@ void add_score_edge(graphLike & scoreGraph, const int score, const int A, const 
  * that is, the source node has a sufix that is a prefix to the destination node with some overlap
 **/
 void build_graph(const std::vector<std::string> fragments, graphLike & graph, graphLike & scoreGraph) {
-    int min_overlap = 3;//TODO: BUG: a min overlap of 2 leads to a core dump.
     /* put all nodes in the graph with no edges */
     #pragma omp parallel for
     for(unsigned long i=0; i < fragments.size(); ++i) {
@@ -155,17 +156,15 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
 
             /* add edges to graph */
 
-            if (bestJ >= min_overlap) {
+            if (bestJ >= MIN_FRAGMENT_OVERLAP) {
                 std::pair<int, int> edge = {I, bestJ};
-                std::pair<int, int> reverseEdge = {J, bestJ};
                 #pragma omp critical
                 graph[J].push_back(edge);
                 add_score_edge(scoreGraph, bestJ, J, I);
             }
 
-            if (bestI >= min_overlap) {
+            if (bestI >= MIN_FRAGMENT_OVERLAP) {
                 std::pair<int, int> edge = {J, bestI};
-                std::pair<int, int> reverseEdge = {I, bestI};
                 #pragma omp critical
                 graph[I].push_back(edge);
                 add_score_edge(scoreGraph, bestI, I, J);
@@ -176,7 +175,7 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
 }
 
 /* a utility function to output a graphs adjacency lists */
-void print_adjacency_lists(graphLike & graph){
+void print_adjacency_lists(const graphLike & graph){
     for (auto it=graph.begin(); it!=graph.end(); ++it) {
         std::cout << it->first << ":\t";
         for (auto pair=it->second.begin(); pair!=it->second.end(); ++pair) {
@@ -187,23 +186,24 @@ void print_adjacency_lists(graphLike & graph){
 }
 
 /* append a fragment to the front of the result with some overlap, not used*/
-void append_prefix_string(std::string & result, std:: string & P, int overlap) {
+void append_prefix_string(std::string & result, const std::string & P, const int & overlap) {
     result = P.substr(0, overlap) + result;
 }
 
 /* append a fragment to the end of the result with some overlap*/
-void append_suffix_string(std::string & result, std::string & S, int overlap) {
+void append_suffix_string(std::string & result, const std::string & S, const int & overlap) {
     result += S.substr(overlap, S.length());
 }
 
 /* create a greedy Hamiltonian(?) path and walk it */
-std::string walk_graph(std::vector<std::string> & fragments, graphLike & graph, graphLike & scoreGraph) {
+std::string walk_graph(const std::vector<std::string> & fragments, const graphLike & graph, const graphLike & scoreGraph) {
     std::string result;
     std::map<int, int> path;
     std::map<int, int> overlaps;
     std::set<int> visited;
     int current_node;
 
+    /* greadily add edges to a path by the highest weight */
     for (auto score_rit=scoreGraph.rbegin(); score_rit!=scoreGraph.rend(); ++score_rit) {
         int overlap = score_rit->first;
         for(int i=0; i < score_rit->second.size(); ++i) {
@@ -216,38 +216,45 @@ std::string walk_graph(std::vector<std::string> & fragments, graphLike & graph, 
         }
     }
 
+    /* find the first node that was not visited, this should be the start */
     for(int i=0; i< fragments.size(); ++i) {
         if(visited.count(i) == 0) {
             current_node = i;
             break;
         }
     }
+
+    /* set the result to be the first fragment */
     result = fragments[current_node];
 
-    int overlap; 
-    int offset = result.length() - overlaps[current_node]; 
+    int overlap, append_node, offset; 
+    if (DISPLAY_ALIGNMENTS == 1) {
+        offset = result.length() - overlaps[current_node];
+        std::cout << result << std::endl;
+    }
+    /* while there is a next node, lookup the overlap and append the fragment */
     while (path.count(current_node) > 0) {
         overlap = overlaps[current_node];
-        // for(int o=0; o<offset;++o) { std::cout << " "; }
-        // std::cout << fragments[path[current_node]] << std::endl;
-        int append_node = current_node;
+        append_node = current_node;
         current_node = path[current_node];
-        offset += fragments[current_node].length() - overlaps[current_node];
         append_suffix_string(result, fragments[current_node], overlaps[append_node]);
+        if (DISPLAY_ALIGNMENTS == 1) {
+            for(int o=0; o<offset;++o) { std::cout << " "; }
+            std::cout << fragments[path[append_node]] << std::endl;
+            offset += fragments[current_node].length() - overlaps[current_node];
+        }
     }
-
     return result;
 }
 
 int main(int argc, char**argv) {
-
     if (argc == 2) {
         std::vector<std::string> fragments;
         graphLike graph;
         graphLike scoresGraph; //std::map<score, std::vector <std::pair<to, from>>>
         std::string result;
 
-        /* read fragments */
+        /* read in fragments */
         read_fragments(fragments, argv[1]);
 
         /* prune pure substrings as they add no new information (Assumption) */
