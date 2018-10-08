@@ -1,4 +1,37 @@
 /**
+ * Zachary Falkner
+ * CSCI558 - Computational Biology
+ * Assembly
+ * 
+ * My implementation for this solution generates a graph of directed edges from a node who's suffix is the prefix of the destination node
+ * with a weight of the number of overlapping characters.
+ * In addition a metagraph is kept tracking overlap weights to edges.
+ * Those edges are then greedily consumed to construct a hamiltonian path.
+ * Finally the path is walked and a result sequence constructed based on the path and tracked overlaps.
+ * The input size is reduce by eliminating fragments that are pure substrigns of other fragments.
+ * 
+ * Open MP pragmas are included to signifigantly increase performance on large input sets.
+ * 
+ * This implementation leans on a few key assumptions
+ * 1.) that the fragments provide full coverage of the original sequence
+ * 2.) that fragments which are pure substrings of other fragments provide no extra information
+ *      - while this may not be true, leaning on signifigant over coverage (see 1) makes this acceptable
+ *      - working under this assumption, the size of the input set can be signfigently reduce before construction of the graph
+ * 3.) that greedy consumption of edges will provide an ideal reconstruction of the sequence
+ * 
+ * It does alright.
+ * 
+ * GATTA
+ *  ATTACCAATT
+ *     ACCAATTAC
+ *       CAATTACC
+ *        AATTACCAGG
+ *           TACCAGGA
+ * GATTACCAATTACCAGGA
+ * 
+**/
+
+/**
  * GRAD CHALLENGE 1 (GENOME ASSEMBLY): Create a program to try to assemble a linear chromosome (a string of 'G', 'A', 'T', and 'C' [uppercase only] using only short reads). Your program must be entirely original and must not use any external libraries (except for numpy in python or the C++ standard library in C++). Your program must consist of a single source file (if using python) or compile from a single source file without any extra compilation flags (if using C++). C++ programs will be compiled with -std=c++11 (and -O3 and -march=native and -fopenmp), so using the C++11 standard is fine. Regardless of language, your program should accept one command line parameter: the name of a text file containing all of the short reads (one short read per line). Your program should output only one thing: the string ('G', 'A', 'T', and 'C' [uppercase only]) that you believe was used to generate the reads (whitespace in your output does not matter); this is your genome assembly. Your submission must run in <10 minutes on <10000 fragments each with length >10bp and <100bp.
  * 
  * Here is the program that will be used to generate short reads: make_fragments.py
@@ -69,23 +102,26 @@ void read_fragments(std::vector<std::string> & fragments, const std::string & pa
 /* remove all fragments that are substrings of other fragments */
 void prune_substring_fragments(std::vector<std::string> & fragments) {
     std::set<int> prune_fragments;
-    int I, J;
+    unsigned int I, J;
     #pragma omp parallel for private(J) schedule(dynamic, 3)
     for(I=0; I < fragments.size(); ++I) {
         for (J=I+1; J < fragments.size(); ++J) {
             if(fragments[I].length() <= fragments[J].length()) {
-                if(fragments[J].find(fragments[I]) != std::string::npos) { // I is substring of J, erase I
+                /* check if I is substring of J, erase I if so */
+                if(fragments[J].find(fragments[I]) != std::string::npos) {
                     #pragma omp critical
                     prune_fragments.insert(I);
                 }
             } else {
-                if(fragments[I].find(fragments[J]) != std::string::npos) { // J is substring of I, erase J
+                /* check if J is substring of I, erase J if so */
+                if(fragments[I].find(fragments[J]) != std::string::npos) {
                     #pragma omp critical
                     prune_fragments.insert(J);
                 }
             }
         }
     }
+    /* remove fragments from greatest index to smallest, don't have to change other indexes to prune as vector shrinks */
     for(std::set<int>::reverse_iterator rit=prune_fragments.rbegin(); rit != prune_fragments.rend(); rit++) {
         int id = *rit;
         fragments.erase(fragments.begin() + id);
@@ -126,9 +162,9 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
             int weightJ = 0;  //suffix of J prefix of I J -> I
             int bestI = 0;
             int bestJ = 0;
-            for (int i = 0, j=fragments[J].length() - 1; i < fragments[I].length() && j >= 0; ++i, --j) {
+            for (unsigned int i = 0, j=fragments[J].length() - 1; i < fragments[I].length() && j >= 0; ++i, --j) {
                     weightJ = 0;
-                    for (int c = 0, d = j; c <= i && d < fragments[J].length(); ++c, ++d) {
+                    for (unsigned int c = 0, d = j; c <= i && d < fragments[J].length(); ++c, ++d) {
                         if(fragments[I][c] == fragments [J][d]) {
                             ++weightJ;
                         } else {
@@ -140,9 +176,9 @@ void build_graph(const std::vector<std::string> fragments, graphLike & graph, gr
                     bestJ = std::max(bestJ, weightJ);
             }
 
-            for (int i=fragments[I].length() -1, j=0; i >=0 && j < fragments[J].length(); --i, ++j) {
+            for (unsigned int i=fragments[I].length() -1, j=0; i >=0 && j < fragments[J].length(); --i, ++j) {
                     weightI = 0;
-                    for(int c = i, d = 0; c < fragments[I].length() && d <= j; ++c, ++d) {
+                    for(unsigned int c = i, d = 0; c < fragments[I].length() && d <= j; ++c, ++d) {
                         if(fragments[I][c] == fragments [J][d]) {
                             ++weightI;
                         } else {
@@ -196,7 +232,7 @@ void append_suffix_string(std::string & result, const std::string & S, const int
 }
 
 /* create a greedy Hamiltonian(?) path and walk it */
-std::string walk_graph(const std::vector<std::string> & fragments, const graphLike & graph, const graphLike & scoreGraph) {
+std::string assemble(const std::vector<std::string> & fragments, const graphLike & scoreGraph) {
     std::string result;
     std::map<int, int> path;
     std::map<int, int> overlaps;
@@ -206,18 +242,23 @@ std::string walk_graph(const std::vector<std::string> & fragments, const graphLi
     /* greadily add edges to a path by the highest weight */
     for (auto score_rit=scoreGraph.rbegin(); score_rit!=scoreGraph.rend(); ++score_rit) {
         int overlap = score_rit->first;
-        for(int i=0; i < score_rit->second.size(); ++i) {
+        /* for each edge with the current weight */
+        for(unsigned int i=0; i < score_rit->second.size(); ++i) {
             std::pair<int, int> edge = score_rit->second[i];
+            /* if the destination node has not been visited and the source node is not already a part of the path */
             if(visited.count(edge.second) == 0  && path.count(edge.first) == 0) {
+                /* mark the destination node as having been visited */
                 visited.insert(edge.second);
+                /* and add the edge to the path */
                 path[edge.first] = edge.second;
+                /* track the overlap for easy lookup */
                 overlaps[edge.first] = overlap;
             }
         }
     }
 
     /* find the first node that was not visited, this should be the start */
-    for(int i=0; i< fragments.size(); ++i) {
+    for(unsigned int i=0; i< fragments.size(); ++i) {
         if(visited.count(i) == 0) {
             current_node = i;
             break;
@@ -227,7 +268,7 @@ std::string walk_graph(const std::vector<std::string> & fragments, const graphLi
     /* set the result to be the first fragment */
     result = fragments[current_node];
 
-    int overlap, append_node, offset; 
+    int overlap, offset;
     if (DISPLAY_ALIGNMENTS == 1) {
         offset = result.length() - overlaps[current_node];
         std::cout << result << std::endl;
@@ -235,12 +276,14 @@ std::string walk_graph(const std::vector<std::string> & fragments, const graphLi
     /* while there is a next node, lookup the overlap and append the fragment */
     while (path.count(current_node) > 0) {
         overlap = overlaps[current_node];
-        append_node = current_node;
+        /* progress the current node */
         current_node = path[current_node];
-        append_suffix_string(result, fragments[current_node], overlaps[append_node]);
+        /* append to result */
+        append_suffix_string(result, fragments[current_node], overlap);
+        /* this will print staggered fragments with alignment */
         if (DISPLAY_ALIGNMENTS == 1) {
             for(int o=0; o<offset;++o) { std::cout << " "; }
-            std::cout << fragments[path[append_node]] << std::endl;
+            std::cout << fragments[current_node] << std::endl;
             offset += fragments[current_node].length() - overlaps[current_node];
         }
     }
@@ -266,7 +309,7 @@ int main(int argc, char**argv) {
         // print_adjacency_lists(graph);
         
         /* Assemble... */
-        result = walk_graph(fragments, graph, scoresGraph);
+        result = assemble(fragments, scoresGraph);
 
         /* Output */
         std::cout << result << std::endl;

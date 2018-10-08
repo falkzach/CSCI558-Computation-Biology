@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-I -O3 -std=c++11 -march=native -fopenmp
+CFLAGS=-I -O3 -std=c++11 -march=native -fopenmp -Wall
 TARGET=assemble
 TEST_INPUT=fragments.txt
 
