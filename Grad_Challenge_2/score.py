@@ -39,7 +39,7 @@ if __name__ == "__main__":
                 overlap = True
                 break
         if overlap == False:
-            score+= mismatch
+            score += mismatch
 
     # this is a really bad version of the scoring algorith that will run forever on larege inputs
     # for index, row in ranges_df.iterrows():

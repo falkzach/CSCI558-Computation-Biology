@@ -22,12 +22,14 @@
 **/
 
 #include <algorithm>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include <omp.h>
+#include <time.h>
 
 /**
  * G-> 0 = 00
@@ -38,11 +40,20 @@
 **/ 
 const unsigned char nuc_to_code[] = {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 3, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
 
-void readSingleLineInputFileFromArgument(std::string & result, size_t & length, const char *arg) {
+void readSingleLineInputFile(std::string & result, size_t & length, const char *arg) {
     std::ifstream genome_fin(arg);
     std::getline(genome_fin, result);//assumes genome is single line!
     genome_fin.close();
     length = result.size();
+}
+
+std::string random_genome(const size_t & n) {
+    static const char GATC[] = "GATC";
+    std::string result;
+    for (unsigned int i=0; i<n; ++i) {
+        result += GATC[rand() % (sizeof(GATC) - 1)];
+    }
+    return result;
 }
 
 void print_result_pairs(std::vector<std::pair<int, int>> & results) {
@@ -69,6 +80,12 @@ int bond(const int & a, const int & b) {
     return 0;
 }
 
+/**
+ * an implementation of the chang simplification of Nussinov RNA folding algorithm
+ * 
+ * note the commented pragmas enalbe the algorith to work in paralell on large inputs
+ * however it may be more effective to smaller instances in parallel
+**/
 int chang(const std::string & sequence) {
     size_t n = sequence.length();
     int*matrix = (int*)calloc((n + 1)*(n + 1),sizeof(int));
@@ -77,7 +94,7 @@ int chang(const std::string & sequence) {
         // #pragma omp parallel for private(c,k)
         for (r=0; r<(n-d); ++r) {
             unsigned long max, t;
-            
+
             c = d + r;
             max = matrix[ ((r+1) * n) + (c-1)] + bond(sequence[r],sequence[c]);
             for (k=r; k<c-1; ++k) {
@@ -86,6 +103,8 @@ int chang(const std::string & sequence) {
             }
             // #pragma omp critical
             matrix[(r * (n +1)) + c] = max;
+            // #pragma omp critical
+            matrix[r + (c * (n +1)) ] = max;
         }
     }
     // print_matrix(matrix,n+1,n+1);
@@ -94,37 +113,47 @@ int chang(const std::string & sequence) {
 }
 
 int main(int argc, char**argv) {
-    
+    srand(time(NULL));
     if (argc == 2) {
         std::string genome;
         size_t genome_length = 0;
         std::vector<std::pair<int, int>> rna_ranges;
 
-        readSingleLineInputFileFromArgument(genome, genome_length, argv[1]);
-        
-        int window = 64;
-        int step = 8;
-        int min_score = (window / 5);  //25 for 128, 47 for 256?
+        readSingleLineInputFile(genome, genome_length, argv[1]);
+
+        size_t window = 128;
+        size_t step = 128;
+
+        size_t tests = 1000;
+        int test_score = 0;
+        float tolerance = 1.5f;
 
         #pragma omp parallel for
-        for (unsigned int i =0; i < genome_length; i+=step) {
+        for (unsigned int i=0; i<tests; ++i) {
+            int score;
+            std::string test_genome = random_genome(window);
+            score = chang(test_genome);
+            #pragma omp atomic update
+            test_score += score;
+        }
+        test_score /= tests;
+
+        #pragma omp parallel for
+        for (unsigned int i =0; i<genome_length; i+=step) {
             int look = window;
-            //todo: is this right?
             if (i + window > genome_length) {
                 look = genome_length - i + 1;
-
             }
             std::string sequence = genome.substr(i, look);
             int score = chang(sequence);
-            if (score > min_score) {
+            if (score > test_score * tolerance) {
                 #pragma omp critical
-                // std::cout << score << ",";
-                rna_ranges.push_back( std::pair<int, int> {i, i + look} );
+                rna_ranges.push_back( std::pair<int, int> {i, (i+look) } );
             }
         }
-        // std::cout << std::endl;
 
-        rna_ranges.push_back( std::pair<int, int> {1, genome_length} );
+        //TODO: comment out the algorithm win with a score of 1
+        rna_ranges.push_back( std::pair<int, int> {0, genome_length-1} );
         print_result_pairs(rna_ranges);
         return 0;
     }
