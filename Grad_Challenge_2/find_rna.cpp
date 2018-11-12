@@ -3,6 +3,14 @@
  * CSCI558 - Computational Biology
  * Find RNA Structure
  * 
+ * My implementation runs a sliding window over the genome and performs Change et all (simplified Nussinov) on the window.
+ * The resulting score is compared to the folding average folding score of 1000 similarly sized gragments and must perform 110% as well.
+ * This results in finding ~800 of 1100 rna/gene encodings in pyrococcus furriosus. However it also finds a large volume of false positives.
+ * 
+ * Future steps: implementing the thermodynamically stable Zuker algorithm and running it only on ranges with high scoring Change results could reduce the false positive results.
+ * 
+ * 
+ * 
 **/
 
 /**
@@ -112,15 +120,15 @@ int chang(const std::string & sequence) {
     return score;
 }
 
-int zuker(const std::string & sequence) {
-    size_t n = sequence.length();
-    int*matrix = (int*)calloc((n + 1)*(n + 1),sizeof(int));
+// int zuker(const std::string & sequence) {
+//     size_t n = sequence.length();
+//     int*matrix = (int*)calloc((n + 1)*(n + 1),sizeof(int));
 
-    //todo: implement zuker...
+//     //todo: implement zuker...
 
-    int score = n/2; //todo: get score from matrix
-    return score;
-}
+//     int score = n/2; //todo: get score from matrix
+//     return score;
+// }
 
 int main(int argc, char**argv) {
     srand(time(NULL));
@@ -131,8 +139,8 @@ int main(int argc, char**argv) {
 
         readSingleLineInputFile(genome, genome_length, argv[1]);
 
-        size_t window = 99;
-        size_t step = 66;
+        size_t window = 128;
+        size_t step = 64;
 
         size_t tests = 1000;
         int test_score = 0;
