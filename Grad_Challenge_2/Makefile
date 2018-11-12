@@ -1,8 +1,10 @@
 CC=g++
 CFLAGS=-I -O3 -std=c++11 -march=native -fopenmp -Wall
+PYTHON=python3
 TARGET=find_rna
 TEST_INPUT=pyrococcus_furiosus.genome
-TEST_INPUT=small.txt
+TEST_OUTPUT=results.txt
+TEST_COMPARE=ranges.txt
 
 all: $(TARGET).o
 
@@ -13,4 +15,7 @@ clean:
 	rm -f *.o 
 	
 check: all
-	./$(TARGET).o $(TEST_INPUT)
+	time ./$(TARGET).o $(TEST_INPUT) > $(TEST_OUTPUT)
+
+score: all
+	$(PYTHON) score.py $(TEST_COMPARE) $(TEST_OUTPUT)

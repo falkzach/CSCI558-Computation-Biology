@@ -27,11 +27,7 @@
 #include <string>
 #include <vector>
 
-/**
- * TODO: disable debugging
- **/ 
-#define SANITY_CHECK 1
-#define DEBUG_ON 1
+#include <omp.h>
 
 /**
  * G-> 0 = 00
@@ -41,126 +37,95 @@
  * -1uc otherwise
 **/ 
 const unsigned char nuc_to_code[] = {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 1, 255, 3, 255, 255, 255, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255};
-const unsigned char code_to_nuc[] = {'G', 'A', 'T', 'C'};
-
-/**
- * provides a mask for the length of the fragment, keeps n bitpacked charters where n is the index
-**/ 
-const unsigned long nibs_to_mask[] = {0x0, 0xc000000000000000, 0xf000000000000000, 0xfc00000000000000, 0xff00000000000000, 0xffc0000000000000, 0xfff0000000000000, 0xfffc000000000000, 0xffff000000000000, 0xffffc00000000000, 0xfffff00000000000, 0xfffffc0000000000, 0xffffff0000000000, 0xffffffc000000000, 0xfffffff000000000, 0xfffffffc00000000, 0xffffffff00000000, 0xffffffffc0000000, 0xfffffffff0000000, 0xfffffffffc000000, 0xffffffffff000000, 0xffffffffffc00000, 0xfffffffffff00000, 0xfffffffffffc0000, 0xffffffffffff0000, 0xffffffffffffc000, 0xfffffffffffff000, 0xfffffffffffffc00, 0xffffffffffffff00, 0xffffffffffffffc0, 0xfffffffffffffff0, 0xfffffffffffffffc, 0xffffffffffffffff, };
-
-constexpr unsigned int NUCLEOTITES_PER_BLOCK = sizeof(unsigned long) * 8 / 2;
 
 void readSingleLineInputFileFromArgument(std::string & result, size_t & length, const char *arg) {
-        std::ifstream genome_fin(arg);
-        std::getline(genome_fin, result);//assumes genome is single line!
-        genome_fin.close();
-        length = result.size();
-}
-
-void bit_pack(unsigned long * & result, size_t & num_blocks, const std::string & genome) {
-
-	num_blocks = genome.size() / NUCLEOTITES_PER_BLOCK;
-
-	if (num_blocks * NUCLEOTITES_PER_BLOCK != genome.size()) {
-		++num_blocks;
-	}
-
-	result = (unsigned long*)calloc(num_blocks, sizeof(unsigned long));
-
-	unsigned long i = 0;
-
-	for (unsigned long block=0; block<num_blocks-1; ++block) {
-		unsigned long next_block = 0;
-		for (unsigned char j=0; j<NUCLEOTITES_PER_BLOCK; ++j, ++i) {
-			next_block <<= 2;
-
-			next_block |= nuc_to_code[ (int) genome[i] ];
-		}
-		result[block] = next_block;
-	}
-
-	// this loop is the inner body of the last itteration of the above loop
-	unsigned long next_block = 0;
-	for (unsigned char j=0; j<NUCLEOTITES_PER_BLOCK; ++j, ++i) {
-		next_block <<= 2;
-
-		if (i < genome.size()) {
-			next_block |= nuc_to_code[ (int) genome[i] ];
-		}
-	}
-	result[num_blocks-1] = next_block;
-}
-
-void print_bitpacked_string(const unsigned long* genome, const size_t & num_blocks) {
-    std::cout << "packed: ";
-	for (unsigned long block=0; block<num_blocks; ++block) {
-		std::cout << std::hex << genome[block];
-	}
-	std::cout << std::endl;
-}
-
-std::string unpack_bit_packed_genome(const unsigned long * genome, const size_t & num_blocks, size_t length) {
-    std::string result;
-    unsigned long chars_left = length;
-    for (unsigned long block=0; block < num_blocks - 1; ++block) {
-        unsigned long current_block = genome[block];
-        for (unsigned char j=0; j<NUCLEOTITES_PER_BLOCK; ++j, --chars_left) {
-                    unsigned long nib = current_block & nibs_to_mask[1];
-        nib >>= (NUCLEOTITES_PER_BLOCK * 2) - 2;
-        char c = code_to_nuc[nib];
-        result += c;
-        current_block <<= 2;
-        }
-	}
-
-    unsigned long current_block = genome[num_blocks - 1];
-    for (unsigned char j=0; j<NUCLEOTITES_PER_BLOCK; ++j, --chars_left) {
-        if(chars_left <= 0)
-        {
-            break;
-        }
-        unsigned long nib = current_block & nibs_to_mask[1];
-        nib >>= (NUCLEOTITES_PER_BLOCK * 2) - 2;
-        char c = code_to_nuc[nib];
-        result += c;
-        current_block <<= 2;
-    }
-	return result;
+    std::ifstream genome_fin(arg);
+    std::getline(genome_fin, result);//assumes genome is single line!
+    genome_fin.close();
+    length = result.size();
 }
 
 void print_result_pairs(std::vector<std::pair<int, int>> & results) {
     for (std::pair<int, int> result: results) {
         std::cout << result.first << " " << result.second << std::endl;
     }
+}
 
+void print_matrix(int*matrix, const unsigned int & R, const unsigned int & C) {
+    for(unsigned int i=0; i<R; ++i) {
+        for (unsigned int j=0; j<C; ++j) {
+            std::cout << matrix[i * (C) + j];
+        }
+        std::cout << std::endl;
+    }
+}
+
+int bond(const int & a, const int & b) {
+    //1 if AU, GC, or GU, 0 otherwise
+    //simplify to AT and GC
+    if ( (nuc_to_code[a] + nuc_to_code[b]) == 3 ) {
+        return 1;
+    }
+    return 0;
+}
+
+int chang(const std::string & sequence) {
+    size_t n = sequence.length();
+    int*matrix = (int*)calloc((n + 1)*(n + 1),sizeof(int));
+    unsigned int d, r, c, k;
+    for (d=2; d<n; ++d) {
+        // #pragma omp parallel for private(c,k)
+        for (r=0; r<(n-d); ++r) {
+            unsigned long max, t;
+            
+            c = d + r;
+            max = matrix[ ((r+1) * n) + (c-1)] + bond(sequence[r],sequence[c]);
+            for (k=r; k<c-1; ++k) {
+                t = matrix[(r*n) + k] + matrix[(c*n) + (k+1)];
+                max = std::max(max, t);
+            }
+            // #pragma omp critical
+            matrix[(r * (n +1)) + c] = max;
+        }
+    }
+    // print_matrix(matrix,n+1,n+1);
+    int score = matrix[n-1];
+    return score;
 }
 
 int main(int argc, char**argv) {
     
     if (argc == 2) {
-
         std::string genome;
         size_t genome_length = 0;
-        unsigned long * packed_genome;
-        size_t num_blocks_in_genome;
-        std::string unpacked_genome;
-
         std::vector<std::pair<int, int>> rna_ranges;
 
         readSingleLineInputFileFromArgument(genome, genome_length, argv[1]);
-        bit_pack(packed_genome, num_blocks_in_genome, genome);
+        
+        int window = 64;
+        int step = 8;
+        int min_score = (window / 5);  //25 for 128, 47 for 256?
 
-        if (SANITY_CHECK) {
-            std::cout<<"original: " << genome << std::endl;
-            print_bitpacked_string(packed_genome, num_blocks_in_genome);
+        #pragma omp parallel for
+        for (unsigned int i =0; i < genome_length; i+=step) {
+            int look = window;
+            //todo: is this right?
+            if (i + window > genome_length) {
+                look = genome_length - i + 1;
 
-            unpacked_genome = unpack_bit_packed_genome(packed_genome, num_blocks_in_genome, genome_length);
-            std::cout << unpacked_genome << std::endl;
+            }
+            std::string sequence = genome.substr(i, look);
+            int score = chang(sequence);
+            if (score > min_score) {
+                #pragma omp critical
+                // std::cout << score << ",";
+                rna_ranges.push_back( std::pair<int, int> {i, i + look} );
+            }
         }
+        // std::cout << std::endl;
 
-        // rna_ranges.push_back( std::pair<int, int> {1,2} );
+        rna_ranges.push_back( std::pair<int, int> {1, genome_length} );
         print_result_pairs(rna_ranges);
-
         return 0;
     }
     std::cerr << "Usage: " << argv[0] << " <input_file>" << std::endl;
