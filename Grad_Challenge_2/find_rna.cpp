@@ -121,12 +121,12 @@ int main(int argc, char**argv) {
 
         readSingleLineInputFile(genome, genome_length, argv[1]);
 
-        size_t window = 128;
-        size_t step = 128;
+        size_t window = 99;
+        size_t step = 66;
 
         size_t tests = 1000;
         int test_score = 0;
-        float tolerance = 1.5f;
+        float tolerance = 1.11;
 
         #pragma omp parallel for
         for (unsigned int i=0; i<tests; ++i) {
@@ -153,7 +153,7 @@ int main(int argc, char**argv) {
         }
 
         //TODO: comment out the algorithm win with a score of 1
-        rna_ranges.push_back( std::pair<int, int> {0, genome_length-1} );
+        // rna_ranges.push_back( std::pair<int, int> {0, genome_length-1} );
         print_result_pairs(rna_ranges);
         return 0;
     }
