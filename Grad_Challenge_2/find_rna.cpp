@@ -112,6 +112,16 @@ int chang(const std::string & sequence) {
     return score;
 }
 
+int zuker(const std::string & sequence) {
+    size_t n = sequence.length();
+    int*matrix = (int*)calloc((n + 1)*(n + 1),sizeof(int));
+
+    //todo: implement zuker...
+
+    int score = n/2; //todo: get score from matrix
+    return score;
+}
+
 int main(int argc, char**argv) {
     srand(time(NULL));
     if (argc == 2) {
