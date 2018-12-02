@@ -110,24 +110,6 @@ void locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spec
         hashes.push_back(hash);
     }
 
-    // // normalize spectres
-    // std::vector<float> magnitudes;
-    // for (auto spectre: binned_spectres) {
-    //     float magnitude = 0.0;
-    //     for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
-    //         magnitude += (it->second * it->second);
-    //     }
-    //     magnitude = sqrt(magnitude);
-    //     magnitudes.push_back(magnitude);
-    // }
-    // for (size_t i=0; i<binned_spectres.size(); ++i) {
-    //     auto spectre = binned_spectres[i];
-    //     auto magnitude = magnitudes[i];
-    //     for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
-    //         it->second = (1/magnitude) * it->second;
-    //     }
-    // }
-
     // on every spectre, apply every hash
     for (auto spectre: binned_spectres) {
         std::vector<float> spectre_results;
