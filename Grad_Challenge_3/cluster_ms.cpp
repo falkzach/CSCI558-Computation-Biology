@@ -79,7 +79,7 @@ void read_mgf_file(std::vector<std::map<float, float>> & binned_spectres, std::s
     }
 }
 
-void locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spectres, std::set<float> & all_bins) {
+std::vector<std::vector<float>> locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spectres, std::set<float> & all_bins) {
     //prints a nicely aligned picture of occupied bins
     std::cout << std::setprecision(2) << std::fixed;
     for (auto bin: all_bins) {
@@ -148,18 +148,18 @@ void locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spec
         }
         results.push_back(spectre_results);
     }
-
-
-
+    return results;
 }
 
 void cluster(std::vector<std::vector<float>> & results) {
-    // for (size_t i=0; i<results.size(); ++i) {
-    //     for (size_t j=i+1; j<results.size(); ++j) {
-            
-    //     }
-    // }
-
+    for (size_t i=0; i<results.size(); ++i) {
+        for (size_t j=i+1; j<results.size(); ++j) {
+            for (size_t k=0;k<results[i].size(); ++k) {
+                float diff = fabs(results[i][k] - results[j][k]);
+                std::cout << "k = " << k << " dif = " << diff << std::endl;
+            }
+        }
+    }
 }
 
 void print_result_clusters(std::map<int, std::vector<int>> & results) {
@@ -182,7 +182,9 @@ int main(int argc, char**argv) {
 
         read_mgf_file(binned_spectres, all_bins, argv[1]);
 
-        locality_sensitive_hasing(binned_spectres, all_bins);
+        std::vector<std::vector<float>> angles = locality_sensitive_hasing(binned_spectres, all_bins);
+
+        cluster(angles);
         
         print_result_clusters(clusters);
         return 0;
