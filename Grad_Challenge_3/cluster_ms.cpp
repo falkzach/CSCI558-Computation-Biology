@@ -36,6 +36,8 @@
 #include <omp.h>
 #include <time.h>
 
+#define PI 3.14159265
+
 #define HASHES 10
 #define BEGIN_IONS "BEGIN IONS"
 #define END_IONS "END IONS"
@@ -78,7 +80,6 @@ void read_mgf_file(std::vector<std::map<float, float>> & binned_spectres, std::s
 }
 
 void locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spectres, std::set<float> & all_bins) {
-
     //prints a nicely aligned picture of occupied bins
     std::cout << std::setprecision(2) << std::fixed;
     for (auto bin: all_bins) {
@@ -95,19 +96,40 @@ void locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spec
         }
         std::cout << std::endl;
     }
+    //end utility print
+
 
     std::vector<std::map<float, float>> hashes;
-    // std::vector<std::map<float, int>> results;
+    std::vector<std::vector<float>> results;
 
-    // generate hashes
+    // generate hashes, normalized hyper planes
     for (size_t i=0; i<HASHES; ++i) {
         std::map<float, float> hash;
-        size_t s = all_bins.size();
+        size_t dimensions = all_bins.size();
         for (auto bin: all_bins) {
             int r = rand()%2;
-            hash[bin] = (1.0f/s) * r;
+            hash[bin] = (1.0f/dimensions) * r;
+            // hash[bin] = r;
         }
         hashes.push_back(hash);
+    }
+
+    // normalize spectres
+    std::vector<float> magnitudes;
+    for (auto spectre: binned_spectres) {
+        float magnitude = 0.0;
+        for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
+            magnitude += (it->second * it->second);
+        }
+        magnitude = sqrt(magnitude);
+        magnitudes.push_back(magnitude);
+    }
+    for (size_t i=0; i<binned_spectres.size(); ++i) {
+        auto spectre = binned_spectres[i];
+        auto magnitude = magnitudes[i];
+        for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
+            it->second = (1.0f/magnitude) * it->second;
+        }
     }
 
     // on every spectre, apply every hash
@@ -115,20 +137,28 @@ void locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spec
         std::vector<float> spectre_results;
         std::cout << "#spectre#" << std::endl;
         for (auto hash: hashes) {
-            int result = 0;
+            float result = 0.0;
             for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
                 result += (it->second * hash[it->first]);
             }
+            result /= (hash.size() * spectre.size());
+            result = acos(result) * 180.00 / PI;
             spectre_results.push_back(result);
-            std::cout << "result: " << result/hash.size() << std::endl;
+            std::cout << "result: " << result << std::endl;
         }
+        results.push_back(spectre_results);
     }
 
 
 
 }
 
-void cluster() {
+void cluster(std::vector<std::vector<float>> & results) {
+    // for (size_t i=0; i<results.size(); ++i) {
+    //     for (size_t j=i+1; j<results.size(); ++j) {
+            
+    //     }
+    // }
 
 }
 
