@@ -81,7 +81,7 @@ void read_mgf_file(std::vector<std::map<float, float>> & binned_spectras, const 
 }
 
 
-std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spectras) {
+std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(const std::vector<std::map<float, float>> & binned_spectras) {
     std::set<float> all_bins;
     float min_x = 0.0;
     float max_x = 0.0;
@@ -96,6 +96,7 @@ std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(std::vector
             max_y = fmax(bin.second, max_y);
         }
     }
+
 
     min_x = *all_bins.begin();
     max_x = *all_bins.rbegin();
@@ -156,7 +157,6 @@ std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(std::vector
                 } else {
                     r = 0;
                 }
-                std::cout << r << std::endl;
                 result.push_back(r);
             }
             #pragma omp critical
@@ -164,11 +164,30 @@ std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(std::vector
         }
         all_spectra_results.push_back(hash_results);
     }
+    //prints a nicely aligned picture of occupied bins
+    // std::cout << std::setprecision(2) << std::fixed;
+    // for (auto bin: all_bins) {
+    //     std::cout << bin << " ";
+    // }
+    // std::cout << std::endl;
+    // for (auto spectre: binned_spectras) {
+    //     for (auto bin: all_bins) {
+    //         if(spectre.count(bin) != 0) {
+    //             std::cout << bin << " ";
+    //         } else {
+    //             std::cout << "       ";
+    //         }
+    //     }
+    //     std::cout << std::endl;
+    // }
+    // end utility print
     return all_spectra_results;
 }
 
-std::map<int, std::vector<int>> cluster(std::vector<std::vector<std::vector<int>>> & results, std::vector<std::map<float, float>> & binned_spectras) {
-    std::map<int, std::vector<int>> clusters;
+std::map<int, std::set<int>> cluster(const std::vector<std::vector<std::vector<int>>> & results, const std::vector<std::map<float, float>> & binned_spectras) {
+    std::map<int, std::set<int>> clusters;
+    std::vector<int> cantor_hashes;
+    // std::vector<int> is_clustered = std::vector<int>(binned_spectras.size(), 0);
     /**
      * bit-pack the hash results of each bin together
      * TODO: this should be doable in the original scoring phase for later optimizations
@@ -179,22 +198,61 @@ std::map<int, std::vector<int>> cluster(std::vector<std::vector<std::vector<int>
         for (auto hash_result: spectra_results) {
             for (size_t r=0; r< hash_result.size(); ++r) {
                 keys[r] <<= 1;//shift in a 0
-                keys[r] &= hash_result[r];//and in the result of the hash
+                keys[r] |= hash_result[r];//and in the result of the hash
+                // keys[r] += hash_result[r];
             }
         }
+        // for (auto key: keys) {
+        //     std::cout << key << " " ;
+        // }
+        // std::cout <<std::endl;
         spectra_keysets.push_back(keys);
     }
 
-    //TODO: OK HOW DO I CLUSTER THESE NOW???
-    for (size_t i=0; i<spectra_keysets.size(); ++i) {
-        
+    //TODO: cantor hash thing?
+    for (auto keyset: spectra_keysets) {
+        unsigned long a = 0;
+        unsigned long b = 0;
+        size_t n = keyset.size();
+        n = 2 << n;
+
+        for (auto& n: keyset) {
+            a += n;
+            b += n;
+        }
+        b += 1;
+        a /= n;
+        b /= n;
+
+        unsigned long h = a * b + 1;
+        cantor_hashes.push_back(h);
+
     }
+
+    for (size_t i=0; i<cantor_hashes.size(); ++i) {
+        clusters[cantor_hashes[i]].insert(i);
+    }
+
+    // for (size_t i=0; i<spectra_keysets.size(); ++i) {
+    //     std::map<float, float> spectre = binned_spectras[i];
+    //     std::map<float, float>::iterator bin = spectre.begin();
+    //     for (size_t j=0; j<spectra_keysets[i].size(); ++j, ++bin) {
+    //         if (spectra_keysets[i][j] > 0) {
+    //             //insert spectra index into cluster by key for bin
+    //             // if (clusters.count(bin->first) == 0) {
+    //             //     clusters[bin->first] = std::set<int>();
+    //             // }
+    //             clusters[bin->first].insert(i);
+    //         }
+    //     }
+        
+    // }
 
     return clusters;
 }
 
-void print_result_clusters(std::map<int, std::vector<int>> & results) {
-    for (std::pair<int, std::vector<int>> result: results) {
+void print_result_clusters(const std::map<int, std::set<int>> & results) {
+    for (std::pair<int, std::set<int>> result: results) {
         for (int index: result.second) {
             std::cout << index << " ";
         }
@@ -207,10 +265,9 @@ int main(int argc, char**argv) {
     if (argc == 2) {
         std::vector<std::map<float, float>> binned_spectras;
         std::vector<std::vector<std::vector<int>>> lsh_results;
-        std::map<int, std::vector<int>> clusters;
+        std::map<int, std::set<int>> clusters;
 
         read_mgf_file(binned_spectras, argv[1]);
-
         lsh_results = locality_sensitive_hasing(binned_spectras);
 
         clusters = cluster(lsh_results, binned_spectras);
