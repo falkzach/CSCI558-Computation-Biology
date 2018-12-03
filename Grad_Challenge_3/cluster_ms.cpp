@@ -1,7 +1,7 @@
 /**
  * Zachary Falkner
  * CSCI558 - Computational Biology
- * Cluster MS Spectre
+ * Cluster MS spectra
  * 
  * 
 **/
@@ -41,125 +41,223 @@
 #define HASHES 10
 #define BEGIN_IONS "BEGIN IONS"
 #define END_IONS "END IONS"
-// #define READ_PATTERN = "^(\\d+\\.\\d+)\\s(\\d+\\.\\d+)$"
+constexpr char  READ_REGULAR_EXPRESSION[] = "^(\\d+\\.\\d+)\\s(\\d+\\.\\d+)$";
 
+float random_float_in_range(float lo, float hi) {
+    float r = lo + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(hi-lo)));
+    return r;
+}
 
 /*
- * http://fiehnlab.ucdavis.edu/projects/lipidblast/mgf-files
+ * read in the mgf data binning it to 2 decimal places
  */
-void read_mgf_file(std::vector<std::map<float, float>> & binned_spectres, std::set<float> & all_bins, const std::string & path) {
+void read_mgf_file(std::vector<std::map<float, float>> & binned_spectras, const std::string & path) {
     std::string line;
     std::ifstream mgf_fin(path);
-    bool inSpectre = false;
-    std::regex readRegex = std::regex("^(\\d+\\.\\d+)\\s(\\d+\\.\\d+)$");
+    bool inspectra = false;
+    std::regex readRegex = std::regex(READ_REGULAR_EXPRESSION);
     std::smatch results;
-    std::map<float, float> spectre;
+    std::map<float, float> spectra;
     while(std::getline(mgf_fin, line)) {
-        if(inSpectre == true) {
+        if(inspectra == true) {
             if (std::regex_search(line, results, readRegex)) {
-                float massToCharge = roundf(std::atof(results[1].str().c_str()) * 100) / 100;  //rounds to 2 digits prior to binning
+                float massToCharge = roundf(std::atof(results[1].str().c_str()) * 100) / 100;  //rounds to 2 digits for binning
                 float abundance = std::atof(results[2].str().c_str());
-                if (spectre.count(massToCharge) == 0) {
-                    spectre[massToCharge] = 0;
+                if (spectra.count(massToCharge) == 0) {
+                    spectra[massToCharge] = 0;
                 }
-                if (all_bins.count(massToCharge) == 0) {
-                    all_bins.insert(massToCharge);
-                }
-                spectre[massToCharge] += abundance;
+                spectra[massToCharge] += abundance;
             } else if (line.compare(END_IONS) == 0) {
-                binned_spectres.push_back(spectre);
-                inSpectre = false;
+                binned_spectras.push_back(spectra);
+                inspectra = false;
             }
         } else {
             if (line.compare(BEGIN_IONS) == 0) {
-                spectre.clear();
-                inSpectre = true;
+                spectra.clear();
+                inspectra = true;
             }
         }
     }
 }
 
-std::vector<std::vector<float>> locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spectres, std::set<float> & all_bins) {
-    //prints a nicely aligned picture of occupied bins
-    std::cout << std::setprecision(2) << std::fixed;
-    for (auto bin: all_bins) {
-        std::cout << bin << " ";
-    }
-    std::cout << std::endl;
-    for (auto spectre: binned_spectres) {
-        for (auto bin: all_bins) {
-            if(spectre.count(bin) != 0) {
-                std::cout << bin << " ";
-            } else {
-                std::cout << "       ";
+
+std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(std::vector<std::map<float, float>> & binned_spectras) {
+    std::set<float> all_bins;
+    float min_x = 0.0;
+    float max_x = 0.0;
+    float min_y = 0.0;
+    float max_y = 0.0;
+
+    for (auto spectra: binned_spectras) {
+        for (auto bin: spectra) {
+            if (all_bins.count(bin.first) == 0) {
+                all_bins.insert(bin.first);
             }
+            max_y = fmax(bin.second, max_y);
         }
-        std::cout << std::endl;
     }
-    //end utility print
+    // min_y = -1 * max_y;
 
+    min_x = *all_bins.begin();
+    max_x = *all_bins.rbegin();
 
-    std::vector<std::map<float, float>> hashes;
-    std::vector<std::vector<float>> results;
+    // std::cout << "min_x: " << min_x << std::endl;
+    // std::cout << "max_x: " << max_x << std::endl;
+    // std::cout << "min_y: " << min_y << std::endl;
+    // std::cout << "max_y: " << max_y << std::endl;
 
-    // generate hashes, normalized hyper planes
+    //generate random points as pairs
+    std::vector<std::pair<float, float>> points;
     for (size_t i=0; i<HASHES; ++i) {
-        std::map<float, float> hash;
-        size_t dimensions = all_bins.size();
-        for (auto bin: all_bins) {
-            int r = rand()%2;
-            hash[bin] = (1.0f/dimensions) * r;
-            // hash[bin] = r;
-        }
-        hashes.push_back(hash);
+        float x = random_float_in_range(min_x, max_x);
+        float y = random_float_in_range(min_y, max_y);
+        points.push_back({x,y});
     }
 
-    // normalize spectres
-    std::vector<float> magnitudes;
-    for (auto spectre: binned_spectres) {
-        float magnitude = 0.0;
-        for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
-            magnitude += (it->second * it->second);
-        }
-        magnitude = sqrt(magnitude);
-        magnitudes.push_back(magnitude);
-    }
-    for (size_t i=0; i<binned_spectres.size(); ++i) {
-        auto spectre = binned_spectres[i];
-        auto magnitude = magnitudes[i];
-        for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
-            it->second = (1.0f/magnitude) * it->second;
-        }
-    }
+    std::vector<std::vector<std::vector<int>>> all_spectra_results;
+    //for each spectra
+    for (auto spectra: binned_spectras) {
+        //for each random 2d point (hash, ~10)
+        std::vector<std::vector<int>> hash_results;
+        #pragma omp parallel for
+        for (size_t p=0; p<HASHES; ++p) {
+            //for each bin dot intensity with random 2d point to get angle
+            std::vector<int> result;
+            for (auto bin: spectra) {
+                //TODO: audit this, not getting any negative numbers? maybe it's just the data
+                float theta;
+                theta = (points[p].first * bin.first) + (points[p].second * bin.second); /* A dot B */
+                theta = theta / ( /* divide by magnitude of A mult magnitude of B */
+                    sqrtf( (points[p].first * points[p].first) + (points[p].second * points[p].second) )
+                    * sqrtf( (bin.first * bin.first) + (bin.second * bin.second) )
+                );
+                theta = acos(theta); /* arc cosis */
+                theta = theta * (180.00f / PI);
 
-    // on every spectre, apply every hash
-    for (auto spectre: binned_spectres) {
-        std::vector<float> spectre_results;
-        std::cout << "#spectre#" << std::endl;
-        for (auto hash: hashes) {
-            float result = 0.0;
-            for (auto it=spectre.begin(); it!=spectre.end(); ++it) {
-                result += (it->second * hash[it->first]);
+                if (std::isnan(theta) == 1) {
+                    theta = 0.0f;//don't break things
+                }
+                #pragma omp critical
+                std::cout << "theta: " << theta << std::endl;
+
+                //angle > 0 hash =1, angle < 0 hash =0
+                int r;
+                if (theta >= 0.0) {
+                    r = 1;
+                } else {
+                    r = 0;
+                }
+                result.push_back(r);
             }
-            result /= (hash.size() * spectre.size());
-            result = acos(result) * 180.00 / PI;
-            spectre_results.push_back(result);
-            std::cout << "result: " << result << std::endl;
+            #pragma omp critical
+            hash_results.push_back(result);
         }
-        results.push_back(spectre_results);
+        all_spectra_results.push_back(hash_results);
     }
-    return results;
+    return all_spectra_results;
 }
 
-void cluster(std::vector<std::vector<float>> & results) {
-    for (size_t i=0; i<results.size(); ++i) {
-        for (size_t j=i+1; j<results.size(); ++j) {
-            for (size_t k=0;k<results[i].size(); ++k) {
-                float diff = fabs(results[i][k] - results[j][k]);
-                std::cout << "k = " << k << " dif = " << diff << std::endl;
+
+/**
+ * this is a very bad and insane approach i took, it wasn't working out,
+ * essentially generating arbitrarily large normalized hyperplanes and measuring how they disect the universe of spectras
+ * i was getting results, but i don't think they were good or useful
+**/
+
+// std::vector<std::vector<float>> locality_sensitive_hasing_other(std::vector<std::map<float, float>> & binned_spectras, std::set<float> & all_bins) {
+//     //prints a nicely aligned picture of occupied bins
+//     std::cout << std::setprecision(2) << std::fixed;
+//     for (auto bin: all_bins) {
+//         std::cout << bin << " ";
+//     }
+//     std::cout << std::endl;
+//     for (auto spectra: binned_spectras) {
+//         for (auto bin: all_bins) {
+//             if(spectra.count(bin) != 0) {
+//                 std::cout << bin << " ";
+//             } else {
+//                 std::cout << "       ";
+//             }
+//         }
+//         std::cout << std::endl;
+//     }
+//     //end utility print
+
+
+//     std::vector<std::map<float, float>> hashes;
+//     std::vector<std::vector<float>> results;
+
+//     // generate hashes, normalized hyper planes
+//     for (size_t i=0; i<HASHES; ++i) {
+//         std::map<float, float> hash;
+//         size_t dimensions = all_bins.size();
+//         for (auto bin: all_bins) {
+//             int r = rand()%2;
+//             hash[bin] = (1.0f/dimensions) * r;
+//             // hash[bin] = r;
+//         }
+//         hashes.push_back(hash);
+//     }
+
+//     // normalize spectras
+//     std::vector<float> magnitudes;
+//     for (auto spectra: binned_spectras) {
+//         float magnitude = 0.0;
+//         for (auto it=spectra.begin(); it!=spectra.end(); ++it) {
+//             magnitude += (it->second * it->second);
+//         }
+//         magnitude = sqrt(magnitude);
+//         magnitudes.push_back(magnitude);
+//     }
+//     for (size_t i=0; i<binned_spectras.size(); ++i) {
+//         auto spectra = binned_spectras[i];
+//         auto magnitude = magnitudes[i];
+//         for (auto it=spectra.begin(); it!=spectra.end(); ++it) {
+//             it->second = (1.0f/magnitude) * it->second;
+//         }
+//     }
+
+//     // on every spectra, apply every hash
+//     for (auto spectra: binned_spectras) {
+//         std::vector<float> spectra_results;
+//         std::cout << "#spectra#" << std::endl;
+//         for (auto hash: hashes) {
+//             float result = 0.0;
+//             for (auto it=spectra.begin(); it!=spectra.end(); ++it) {
+//                 result += (it->second * hash[it->first]);
+//             }
+//             result /= (hash.size() * spectra.size());
+//             result = acos(result) * 180.00 / PI;
+//             spectra_results.push_back(result);
+//             std::cout << "result: " << result << std::endl;
+//         }
+//         results.push_back(spectra_results);
+//     }
+//     return results;
+// }
+
+std::map<int, std::vector<int>> cluster(std::vector<std::vector<std::vector<int>>> & results) {
+    std::map<int, std::vector<int>> clusters;
+    // for (size_t i=0; i<results.size(); ++i) {
+    //     for (size_t j=i+1; j<results.size(); ++j) {
+    //         for (size_t k=0;k<results[i].size(); ++k) {
+    //             float diff = fabs(results[i][k] - results[j][k]);
+    //             std::cout << "k = " << k << " dif = " << diff << std::endl;
+    //         }
+    //     }
+    // }
+
+    for (auto spectra_results: results) {
+        std::vector<unsigned int> keys = std::vector<unsigned int>(spectra_results[0].size());
+        for (auto hash_result: spectra_results) {
+            for (size_t r=0; r< hash_result.size(); ++r) {
+                keys[r] <<= 1;
+                keys[r] &= hash_result[r];
             }
         }
     }
+
+
 }
 
 void print_result_clusters(std::map<int, std::vector<int>> & results) {
@@ -174,17 +272,17 @@ void print_result_clusters(std::map<int, std::vector<int>> & results) {
 int main(int argc, char**argv) {
     srand(time(NULL));
     if (argc == 2) {
-        std::vector<std::map<float, float>> binned_spectres;
-        std::set<float> all_bins;
+        std::vector<std::map<float, float>> binned_spectras;
+        std::vector<std::vector<std::vector<int>>> lsh_results;
         std::map<int, std::vector<int>> clusters;
 
-        //TODO: implement....
+        read_mgf_file(binned_spectras, argv[1]);
 
-        read_mgf_file(binned_spectres, all_bins, argv[1]);
+        lsh_results = locality_sensitive_hasing(binned_spectras);
+        std::cout << "lsh complete" << std::endl;
 
-        std::vector<std::vector<float>> angles = locality_sensitive_hasing(binned_spectres, all_bins);
-
-        cluster(angles);
+        clusters = cluster(lsh_results);
+        std::cout << "clustering done" << std::endl;
         
         print_result_clusters(clusters);
         return 0;
