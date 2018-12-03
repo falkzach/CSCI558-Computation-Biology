@@ -3,7 +3,8 @@
  * CSCI558 - Computational Biology
  * Cluster MS spectra
  * 
- * 
+ * This implementation attempts to use Locality Specific Hashing to Cluster MS Spectra.
+ * I feel there are some flaws in my implementation leading to somewhat inconsistent clustering.
 **/
 
 /**
