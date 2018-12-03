@@ -167,21 +167,27 @@ std::vector<std::vector<std::vector<int>>> locality_sensitive_hasing(std::vector
     return all_spectra_results;
 }
 
-std::map<int, std::vector<int>> cluster(std::vector<std::vector<std::vector<int>>> & results) {
+std::map<int, std::vector<int>> cluster(std::vector<std::vector<std::vector<int>>> & results, std::vector<std::map<float, float>> & binned_spectras) {
     std::map<int, std::vector<int>> clusters;
-
-
     /**
      * bit-pack the hash results of each bin together
+     * TODO: this should be doable in the original scoring phase for later optimizations
     **/
+    std::vector<std::vector<unsigned int>> spectra_keysets;
     for (auto spectra_results: results) {
-        std::vector<unsigned int> keys = std::vector<unsigned int>(spectra_results[0].size(), 0);
+        std::vector<unsigned int> keys = std::vector<unsigned int>(spectra_results[0].size(), 0);//ensure a 0 in each location
         for (auto hash_result: spectra_results) {
             for (size_t r=0; r< hash_result.size(); ++r) {
-                keys[r] <<= 1;
-                keys[r] &= hash_result[r];
+                keys[r] <<= 1;//shift in a 0
+                keys[r] &= hash_result[r];//and in the result of the hash
             }
         }
+        spectra_keysets.push_back(keys);
+    }
+
+    //TODO: OK HOW DO I CLUSTER THESE NOW???
+    for (size_t i=0; i<spectra_keysets.size(); ++i) {
+        
     }
 
     return clusters;
@@ -206,10 +212,8 @@ int main(int argc, char**argv) {
         read_mgf_file(binned_spectras, argv[1]);
 
         lsh_results = locality_sensitive_hasing(binned_spectras);
-        std::cout << "lsh complete" << std::endl;
 
-        clusters = cluster(lsh_results);
-        std::cout << "clustering done" << std::endl;
+        clusters = cluster(lsh_results, binned_spectras);
         
         print_result_clusters(clusters);
         return 0;
